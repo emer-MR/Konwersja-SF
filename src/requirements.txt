@@ -1,0 +1,5 @@
+# Konwerter Sprawozdań Finansowych XML → XLSX
+# Zależności projektu
+
+lxml>=4.9.0          # Parsowanie XML z namespace'ami
+openpyxl>=3.1.0      # Generowanie plików XLSX

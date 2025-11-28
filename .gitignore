@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Claude Code settings (local only)
+.claude/
+
+# Przykładowe pliki - dane testowe (za duże dla repo)
+Przykłady konwersji/
+Przykłady sprawozdań/
+Test/
+
+# Pliki tymczasowe
+*.tmp
+*.temp
+nul
+wzorcowy_temp.xlsx
+
+# Schematy XSD (duże pliki referencyjne - pobierz ze strony MF)
+Struktury SF do obróbki/
+Struktury SF-robocze/
+
+# Słowniczek główny (duży plik Excel)
+Słowniczek schematów SF.xlsx
+
+# Output files
+*.xlsx
+!docs/*.xlsx
