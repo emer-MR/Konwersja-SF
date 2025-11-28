@@ -60,6 +60,9 @@ class SimpleXLSXConverter:
         # Zapisz
         wb.save(output_path)
 
+        # Generuj czytelną nazwę pliku
+        readable_filename = self._generate_filename(spr)
+
         # Zwróć metadane
         return {
             "company_name": spr.dane_firmy.nazwa,
@@ -67,8 +70,24 @@ class SimpleXLSXConverter:
             "entity_type": spr.metadane.typ_jednostki,
             "period_from": spr.metadane.okres_od,
             "period_to": spr.metadane.okres_do,
-            "output_filename": output_path.name,
+            "output_filename": readable_filename,
         }
+
+    def _generate_filename(self, spr: Sprawozdanie) -> str:
+        """Generuje czytelną nazwę pliku wyjściowego."""
+        meta = spr.metadane
+        firma = spr.dane_firmy.nazwa
+
+        # Usuń znaki niedozwolone w nazwach plików Windows
+        niedozwolone = '<>:"/\\|?*'
+        firma_clean = "".join(c for c in firma if c not in niedozwolone)
+
+        # Ogranicz długość nazwy firmy
+        if len(firma_clean) > 50:
+            firma_clean = firma_clean[:50]
+
+        # Format: SF_2023_NazwaFirmy.xlsx
+        return f"SF_{meta.okres_do.year}_{firma_clean}.xlsx"
 
     def _create_bilans_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz Bilans."""

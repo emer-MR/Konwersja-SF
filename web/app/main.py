@@ -58,9 +58,9 @@ static_path = Path(__file__).parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-# Routery API
+# Routery API (tylko auth, convert obsługujemy przez HTMX poniżej)
 app.include_router(auth_router)
-app.include_router(convert_router)
+# app.include_router(convert_router)  # wyłączone - używamy HTMX endpointów
 
 
 # ============== STRONY HTML ==============
@@ -248,7 +248,7 @@ async def htmx_history(
     )
 
 
-@app.get("/api/convert/limit", response_class=HTMLResponse)
+@app.get("/htmx/limit", response_class=HTMLResponse)
 async def htmx_limit(
     request: Request,
     user: User = Depends(get_current_user),
@@ -281,7 +281,7 @@ async def htmx_limit(
 
 # ============== OVERRIDE API CONVERT DLA HTMX ==============
 
-@app.post("/api/convert/", response_class=HTMLResponse)
+@app.post("/htmx/convert", response_class=HTMLResponse)
 async def htmx_convert(
     request: Request,
     user: User = Depends(get_current_user),
@@ -420,3 +420,38 @@ async def htmx_convert(
     finally:
         if input_path.exists():
             input_path.unlink()
+
+
+@app.get("/api/convert/download/{conversion_id}")
+async def download_file(
+    conversion_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pobieranie pliku XLSX."""
+    from fastapi.responses import FileResponse
+    from sqlalchemy import select
+    from app.models import Conversion
+
+    result = await db.execute(
+        select(Conversion)
+        .where(Conversion.id == conversion_id)
+        .where(Conversion.user_id == user.id)
+    )
+    conversion = result.scalar_one_or_none()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Konwersja nie znaleziona")
+
+    if conversion.status != "success" or not conversion.output_path:
+        raise HTTPException(status_code=400, detail="Plik niedostępny")
+
+    output_path = Path(conversion.output_path)
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Plik nie istnieje")
+
+    return FileResponse(
+        path=output_path,
+        filename=conversion.output_filename or f"konwersja_{conversion_id}.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )

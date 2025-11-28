@@ -14,7 +14,7 @@ aiosqlite>=0.19.0
 
 # Autentykacja
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
 pydantic[email]>=2.0.0
 
 # Konwersja XML -> XLSX (z projektu głównego)
