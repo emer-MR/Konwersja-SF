@@ -1,0 +1,49 @@
+# Docker Compose dla Konwertera SF
+# Przeznaczony do uruchomienia na Synology NAS
+
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    container_name: konwerter-sf
+    restart: unless-stopped
+
+    # Porty
+    ports:
+      - "8080:8000"
+
+    # Zmienne środowiskowe
+    environment:
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-zmien-to-na-produkcji-openssl-rand-hex-32}
+      - DATABASE_URL=sqlite+aiosqlite:///./data/app.db
+      - MAX_CONVERSIONS_PER_DAY=10
+      - MAX_UPLOAD_SIZE_MB=10
+
+    # Wolumeny (dane persistentne)
+    volumes:
+      - sf_data:/app/data
+
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Limity zasobów (opcjonalne, dla NAS)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+# Wolumen na dane
+volumes:
+  sf_data:
+    driver: local

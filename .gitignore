@@ -62,3 +62,10 @@ Słowniczek schematów SF.xlsx
 # Output files
 *.xlsx
 !docs/*.xlsx
+
+# Web app data
+web/data/
+web/.env
+
+# SQLite database
+*.db

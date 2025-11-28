@@ -1,0 +1,29 @@
+{% if status == "success" %}
+<div class="alert alert-success">
+    <p><strong>Konwersja zakończona pomyślnie!</strong></p>
+    {% if company_name %}
+    <p>Firma: {{ company_name }}</p>
+    {% endif %}
+    {% if company_nip %}
+    <p>NIP: {{ company_nip }}</p>
+    {% endif %}
+    {% if entity_type %}
+    <p>Typ jednostki: {{ entity_type }}</p>
+    {% endif %}
+    {% if period_from and period_to %}
+    <p>Okres: {{ period_from }} - {{ period_to }}</p>
+    {% endif %}
+    <p>
+        <a href="{{ download_url }}" role="button">
+            Pobierz plik XLSX
+        </a>
+    </p>
+</div>
+{% else %}
+<div class="alert alert-error">
+    <p><strong>Błąd konwersji</strong></p>
+    {% if error_message %}
+    <p>{{ error_message }}</p>
+    {% endif %}
+</div>
+{% endif %}

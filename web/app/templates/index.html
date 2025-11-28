@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Konwerter SF - Strona główna{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h1>Konwerter Sprawozdań Finansowych</h1>
+        <p>Przekształć e-Sprawozdanie XML na czytelny plik Excel</p>
+    </header>
+
+    <section>
+        <h3>Co oferujemy?</h3>
+        <ul>
+            <li><strong>Konwersja XML → XLSX</strong> - zamień plik e-Sprawozdania na Excel</li>
+            <li><strong>Bilans i RZiS</strong> - uporządkowane arkusze z danymi</li>
+            <li><strong>Wszystkie typy jednostek</strong> - Mikro, Mała, Inna</li>
+            <li><strong>Bezpłatnie</strong> - do 10 konwersji dziennie</li>
+        </ul>
+    </section>
+
+    <section>
+        <h3>Jak to działa?</h3>
+        <ol>
+            <li>Zarejestruj się lub zaloguj</li>
+            <li>Prześlij plik XML (e-Sprawozdanie)</li>
+            <li>Pobierz gotowy plik Excel</li>
+        </ol>
+    </section>
+
+    <footer>
+        <a href="/register" role="button">Zarejestruj się</a>
+        <a href="/login" role="button" class="outline">Zaloguj się</a>
+    </footer>
+</article>
+{% endblock %}

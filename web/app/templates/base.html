@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Konwerter SF{% endblock %}</title>
+
+    <!-- Pico CSS - minimalistyczny framework -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+
+    <!-- HTMX - dynamika bez JS -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <style>
+        :root {
+            --pico-font-size: 16px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+
+        header nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        header .nav-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: var(--pico-border-radius);
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .limit-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background-color: var(--pico-secondary-background);
+            border-radius: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .limit-badge.warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .limit-badge.danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--pico-muted-border-color);
+            border-radius: var(--pico-border-radius);
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .upload-area:hover {
+            border-color: var(--pico-primary);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--pico-primary);
+            background-color: var(--pico-secondary-background);
+        }
+
+        .history-table {
+            font-size: 0.875rem;
+        }
+
+        .history-table td {
+            vertical-align: middle;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        /* HTMX loading indicator */
+        .htmx-indicator {
+            display: none;
+        }
+
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+        }
+
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--pico-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        footer {
+            margin-top: 3rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--pico-muted-border-color);
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--pico-muted-color);
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <nav>
+                <a href="/" class="logo">Konwerter SF</a>
+                <div class="nav-links">
+                    {% if user %}
+                        <span>{{ user.email }}</span>
+                        <a href="/logout" role="button" class="outline secondary">Wyloguj</a>
+                    {% else %}
+                        <a href="/login">Zaloguj</a>
+                        <a href="/register" role="button">Zarejestruj</a>
+                    {% endif %}
+                </div>
+            </nav>
+        </header>
+
+        {% block content %}{% endblock %}
+
+        <footer>
+            <p>Konwerter Sprawozdań Finansowych XML &rarr; XLSX</p>
+            <p>Wersja uproszczona (Bilans + RZiS)</p>
+        </footer>
+    </main>
+</body>
+</html>

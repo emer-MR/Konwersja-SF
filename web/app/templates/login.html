@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Logowanie - Konwerter SF{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Logowanie</h2>
+    </header>
+
+    {% if error %}
+    <div class="alert alert-error">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login">
+        <label for="email">
+            Email
+            <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="jan@example.com"
+                required
+                autocomplete="email"
+            >
+        </label>
+
+        <label for="password">
+            Hasło
+            <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="********"
+                required
+                autocomplete="current-password"
+            >
+        </label>
+
+        <button type="submit">Zaloguj się</button>
+    </form>
+
+    <footer>
+        <p>Nie masz konta? <a href="/register">Zarejestruj się</a></p>
+    </footer>
+</article>
+{% endblock %}

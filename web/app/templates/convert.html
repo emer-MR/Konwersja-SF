@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Konwertuj sprawozdanie - Konwerter SF{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Konwertuj sprawozdanie finansowe</h2>
+        <p>Prześlij plik XML (e-Sprawozdanie) aby otrzymać plik Excel z Bilansem i RZiS.</p>
+    </header>
+
+    <!-- Limit dzienny -->
+    <div id="limit-info" hx-get="/api/convert/limit" hx-trigger="load" hx-swap="innerHTML">
+        <span class="htmx-indicator"><span class="spinner"></span>Ładowanie...</span>
+    </div>
+
+    <!-- Formularz uploadu -->
+    <form
+        id="upload-form"
+        hx-post="/api/convert/"
+        hx-encoding="multipart/form-data"
+        hx-target="#result"
+        hx-swap="innerHTML"
+        hx-indicator="#upload-indicator"
+    >
+        <div class="upload-area" id="drop-zone">
+            <p><strong>Przeciągnij plik XML tutaj</strong></p>
+            <p>lub</p>
+            <input
+                type="file"
+                id="file"
+                name="file"
+                accept=".xml,.xades"
+                required
+            >
+            <p><small>Akceptowane formaty: XML, XAdES (max 10 MB)</small></p>
+        </div>
+
+        <button type="submit" id="submit-btn">
+            <span id="upload-indicator" class="htmx-indicator">
+                <span class="spinner"></span>
+            </span>
+            Konwertuj
+        </button>
+    </form>
+
+    <!-- Wynik konwersji -->
+    <div id="result"></div>
+</article>
+
+<!-- Historia konwersji -->
+<article>
+    <header>
+        <h3>Historia konwersji</h3>
+    </header>
+
+    <div
+        id="history"
+        hx-get="/htmx/history"
+        hx-trigger="load, conversionComplete from:body"
+        hx-swap="innerHTML"
+    >
+        <span class="htmx-indicator"><span class="spinner"></span>Ładowanie...</span>
+    </div>
+</article>
+
+<script>
+    // Drag & drop
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file');
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+        }
+    });
+
+    // Po udanej konwersji - odśwież historię i limit
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/convert/' && evt.detail.successful) {
+            // Trigger refresh historii
+            htmx.trigger('#history', 'conversionComplete');
+            // Odśwież limit
+            htmx.ajax('GET', '/api/convert/limit', '#limit-info');
+        }
+    });
+</script>
+{% endblock %}

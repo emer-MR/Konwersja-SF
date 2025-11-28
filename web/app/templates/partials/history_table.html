@@ -1,0 +1,48 @@
+{% if conversions %}
+<table class="history-table">
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Plik wejściowy</th>
+            <th>Firma</th>
+            <th>Status</th>
+            <th>Akcja</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for conv in conversions %}
+        <tr>
+            <td>{{ conv.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ conv.input_filename[:30] }}{% if conv.input_filename|length > 30 %}...{% endif %}</td>
+            <td>
+                {% if conv.company_name %}
+                    {{ conv.company_name[:25] }}{% if conv.company_name|length > 25 %}...{% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>
+                {% if conv.status == "success" %}
+                    <span class="status-badge status-success">OK</span>
+                {% elif conv.status == "error" %}
+                    <span class="status-badge status-error" title="{{ conv.error_message or '' }}">Błąd</span>
+                {% else %}
+                    <span class="status-badge status-pending">W toku</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if conv.download_url %}
+                    <a href="{{ conv.download_url }}" role="button" class="outline secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                        Pobierz
+                    </a>
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>Brak historii konwersji.</em></p>
+{% endif %}
