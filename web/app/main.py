@@ -2,6 +2,7 @@
 Główna aplikacja FastAPI.
 """
 
+import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,7 @@ from app.auth import (
 from app.models import User
 from app.api.auth_routes import router as auth_router
 from app.api.convert_routes import router as convert_router
+from app.xml_validator import validate_xml
 
 
 @asynccontextmanager
@@ -34,6 +36,7 @@ async def lifespan(app: FastAPI):
     Path("./data").mkdir(exist_ok=True)
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    settings.ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Inicjalizuj bazę danych
     await init_db()
@@ -41,6 +44,30 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cleanup (opcjonalnie)
+
+
+async def verify_recaptcha(recaptcha_response: str) -> bool:
+    """Weryfikuje odpowiedź reCAPTCHA z Google."""
+    if not settings.RECAPTCHA_ENABLED:
+        return True
+
+    if not settings.RECAPTCHA_SECRET_KEY:
+        # Jeśli klucz nie jest skonfigurowany, pomijamy weryfikację
+        return True
+
+    if not recaptcha_response:
+        return False
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={
+                "secret": settings.RECAPTCHA_SECRET_KEY,
+                "response": recaptcha_response,
+            }
+        )
+        result = response.json()
+        return result.get("success", False)
 
 
 # Utwórz aplikację
@@ -200,7 +227,12 @@ async def convert_page(
     """Strona konwersji (wymaga logowania)."""
     return templates.TemplateResponse(
         "convert.html",
-        {"request": request, "user": user},
+        {
+            "request": request,
+            "user": user,
+            "recaptcha_site_key": settings.RECAPTCHA_SITE_KEY,
+            "recaptcha_enabled": settings.RECAPTCHA_ENABLED and bool(settings.RECAPTCHA_SITE_KEY),
+        },
     )
 
 
@@ -291,11 +323,29 @@ async def htmx_convert(
     Endpoint konwersji zwracający HTML (dla HTMX).
     """
     import uuid
+    import json
     import aiofiles
     from datetime import date
     from sqlalchemy import select, func
     from app.models import Conversion
     from app.converter_simple import convert_file
+
+    # Pobierz dane formularza
+    form = await request.form()
+
+    # Weryfikacja reCAPTCHA
+    if settings.RECAPTCHA_ENABLED and settings.RECAPTCHA_SECRET_KEY:
+        recaptcha_response = form.get("g-recaptcha-response", "")
+        is_valid = await verify_recaptcha(recaptcha_response)
+        if not is_valid:
+            return templates.TemplateResponse(
+                "partials/conversion_result.html",
+                {
+                    "request": request,
+                    "status": "error",
+                    "error_message": "Weryfikacja reCAPTCHA nie powiodła się. Spróbuj ponownie.",
+                },
+            )
 
     # Sprawdź limit dzienny
     today = date.today()
@@ -317,7 +367,6 @@ async def htmx_convert(
         )
 
     # Pobierz plik z formularza
-    form = await request.form()
     file = form.get("file")
 
     if not file or not hasattr(file, 'filename'):
@@ -354,6 +403,18 @@ async def htmx_convert(
             },
         )
 
+    # Walidacja XML - bezpieczeństwo i struktura
+    is_valid, error_message, entity_type = validate_xml(content)
+    if not is_valid:
+        return templates.TemplateResponse(
+            "partials/conversion_result.html",
+            {
+                "request": request,
+                "status": "error",
+                "error_message": f"Walidacja pliku XML nieudana: {error_message}",
+            },
+        )
+
     # Utwórz rekord konwersji
     conversion = Conversion(
         user_id=user.id,
@@ -368,14 +429,18 @@ async def htmx_convert(
     unique_id = str(uuid.uuid4())
     input_path = settings.UPLOAD_DIR / f"{unique_id}.xml"
     output_path = settings.OUTPUT_DIR / f"{unique_id}.xlsx"
+    attachments_subdir = settings.ATTACHMENTS_DIR / unique_id
 
     try:
         # Zapisz plik
         async with aiofiles.open(input_path, 'wb') as f:
             await f.write(content)
 
+        # Utwórz katalog na załączniki
+        attachments_subdir.mkdir(parents=True, exist_ok=True)
+
         # Konwertuj
-        metadata = convert_file(str(input_path), str(output_path))
+        metadata = convert_file(str(input_path), str(output_path), str(attachments_subdir))
 
         # Aktualizuj rekord
         conversion.status = "success"
@@ -387,6 +452,11 @@ async def htmx_convert(
         conversion.period_from = metadata.get("period_from")
         conversion.period_to = metadata.get("period_to")
 
+        # Zapisz informacje o załącznikach jako JSON w nowej kolumnie (lub w error_message tymczasowo)
+        attachments = metadata.get("attachments", [])
+        if attachments:
+            conversion.attachments_json = json.dumps(attachments, ensure_ascii=False)
+
         await db.flush()
 
         return templates.TemplateResponse(
@@ -394,12 +464,17 @@ async def htmx_convert(
             {
                 "request": request,
                 "status": "success",
+                "conversion_id": conversion.id,
                 "download_url": f"/api/convert/download/{conversion.id}",
                 "company_name": conversion.company_name,
                 "company_nip": conversion.company_nip,
                 "entity_type": conversion.entity_type,
                 "period_from": conversion.period_from,
                 "period_to": conversion.period_to,
+                "jednostka_walutowa": metadata.get("jednostka_walutowa", "PLN"),
+                "wariant_rzis": metadata.get("wariant_rzis", "porownawczy"),
+                "preview": metadata.get("preview", {}),
+                "attachments": attachments,
             },
         )
 
@@ -454,4 +529,121 @@ async def download_file(
         path=output_path,
         filename=conversion.output_filename or f"konwersja_{conversion_id}.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.get("/api/convert/attachment/{conversion_id}/{attachment_id}")
+async def download_attachment(
+    conversion_id: int,
+    attachment_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pobieranie pojedynczego załącznika."""
+    import json
+    from fastapi.responses import FileResponse
+    from sqlalchemy import select
+    from app.models import Conversion
+
+    result = await db.execute(
+        select(Conversion)
+        .where(Conversion.id == conversion_id)
+        .where(Conversion.user_id == user.id)
+    )
+    conversion = result.scalar_one_or_none()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Konwersja nie znaleziona")
+
+    if not conversion.attachments_json:
+        raise HTTPException(status_code=404, detail="Brak załączników")
+
+    # Znajdź załącznik
+    attachments = json.loads(conversion.attachments_json)
+    attachment = None
+    for att in attachments:
+        if att.get("id") == attachment_id:
+            attachment = att
+            break
+
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
+
+    file_path = Path(attachment["path"])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Plik załącznika nie istnieje")
+
+    # Określ typ MIME
+    ext = attachment.get("extension", "").lower()
+    mime_types = {
+        "pdf": "application/pdf",
+        "doc": "application/msword",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xls": "application/vnd.ms-excel",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "txt": "text/plain",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+    }
+    media_type = mime_types.get(ext, "application/octet-stream")
+
+    return FileResponse(
+        path=file_path,
+        filename=attachment.get("original_name", f"zalacznik.{ext}"),
+        media_type=media_type,
+    )
+
+
+@app.get("/api/convert/attachments/{conversion_id}")
+async def download_all_attachments(
+    conversion_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pobieranie wszystkich załączników jako ZIP."""
+    import json
+    import zipfile
+    import io
+    from fastapi.responses import StreamingResponse
+    from sqlalchemy import select
+    from app.models import Conversion
+
+    result = await db.execute(
+        select(Conversion)
+        .where(Conversion.id == conversion_id)
+        .where(Conversion.user_id == user.id)
+    )
+    conversion = result.scalar_one_or_none()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Konwersja nie znaleziona")
+
+    if not conversion.attachments_json:
+        raise HTTPException(status_code=404, detail="Brak załączników")
+
+    attachments = json.loads(conversion.attachments_json)
+    if not attachments:
+        raise HTTPException(status_code=404, detail="Brak załączników")
+
+    # Utwórz ZIP w pamięci
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for att in attachments:
+            file_path = Path(att["path"])
+            if file_path.exists():
+                zip_file.write(file_path, att.get("original_name", file_path.name))
+
+    zip_buffer.seek(0)
+
+    # Generuj nazwę pliku ZIP
+    company = conversion.company_name or "sprawozdanie"
+    # Usuń znaki niedozwolone
+    company_clean = "".join(c for c in company if c not in '<>:"/\\|?*')[:30]
+    zip_filename = f"zalaczniki_{company_clean}.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'}
     )

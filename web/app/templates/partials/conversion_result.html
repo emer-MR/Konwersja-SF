@@ -1,24 +1,288 @@
 {% if status == "success" %}
-<div class="alert alert-success">
-    <p><strong>Konwersja zakończona pomyślnie!</strong></p>
-    {% if company_name %}
-    <p>Firma: {{ company_name }}</p>
+<div class="conversion-result">
+    <div class="alert alert-success">
+        <p><strong>Konwersja zakończona pomyślnie!</strong></p>
+    </div>
+
+    <!-- Podgląd danych ogólnych -->
+    {% if preview and preview.general %}
+    <details open class="preview-section">
+        <summary><strong>Dane ogólne</strong></summary>
+        <table class="preview-table">
+            <tbody>
+                <tr>
+                    <th>Firma</th>
+                    <td>{{ preview.general.firma }}</td>
+                </tr>
+                {% if preview.general.nip %}
+                <tr>
+                    <th>NIP</th>
+                    <td>{{ preview.general.nip }}</td>
+                </tr>
+                {% endif %}
+                {% if preview.general.krs %}
+                <tr>
+                    <th>KRS</th>
+                    <td>{{ preview.general.krs }}</td>
+                </tr>
+                {% endif %}
+                {% if preview.general.regon %}
+                <tr>
+                    <th>REGON</th>
+                    <td>{{ preview.general.regon }}</td>
+                </tr>
+                {% endif %}
+                {% if preview.general.adres %}
+                <tr>
+                    <th>Adres</th>
+                    <td>{{ preview.general.adres }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <th>Okres sprawozdawczy</th>
+                    <td>{{ preview.general.okres }}</td>
+                </tr>
+                <tr>
+                    <th>Typ jednostki</th>
+                    <td>{{ preview.general.typ_jednostki }}</td>
+                </tr>
+                <tr>
+                    <th>Jednostka walutowa</th>
+                    <td>{{ preview.general.jednostka_walutowa }}</td>
+                </tr>
+                <tr>
+                    <th>Wariant RZiS</th>
+                    <td>{{ preview.general.wariant_rzis }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </details>
+
+    <!-- Weryfikacja sum -->
+    {% if preview.weryfikacja %}
+    <details class="preview-section">
+        <summary><strong>Weryfikacja bilansu</strong></summary>
+        <table class="preview-table">
+            <tbody>
+                <tr>
+                    <th>Suma aktywów</th>
+                    <td>{{ preview.weryfikacja.aktywa_biezacy }}</td>
+                </tr>
+                <tr>
+                    <th>Suma pasywów</th>
+                    <td>{{ preview.weryfikacja.pasywa_biezacy }}</td>
+                </tr>
+                <tr>
+                    <th>Zgodność</th>
+                    <td>
+                        {% if preview.weryfikacja.zgodnosc %}
+                        <span class="status-success">OK - Aktywa = Pasywa</span>
+                        {% else %}
+                        <span class="status-error">BŁĄD - Aktywa ≠ Pasywa</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </details>
     {% endif %}
-    {% if company_nip %}
-    <p>NIP: {{ company_nip }}</p>
+
+    <!-- Podgląd bilansu (pierwsze 20 wierszy) -->
+    {% if preview.bilans %}
+    <details class="preview-section">
+        <summary><strong>Podgląd bilansu</strong> (pierwsze 20 pozycji z {{ preview.bilans_total }})</summary>
+        <div class="table-responsive">
+            <table class="preview-table bilans-preview">
+                <thead>
+                    <tr>
+                        <th>Pozycja</th>
+                        <th class="text-right">Rok bieżący</th>
+                        <th class="text-right">Rok poprzedni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview.bilans %}
+                    <tr class="level-{{ row.poziom }}">
+                        <td>{{ row.pozycja }}</td>
+                        <td class="text-right">{{ row.kwota_biezaca }}</td>
+                        <td class="text-right">{{ row.kwota_poprzednia }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if preview.bilans_total > 20 %}
+        <p class="preview-note">... i {{ preview.bilans_total - 20 }} więcej pozycji w pełnym pliku XLSX</p>
+        {% endif %}
+    </details>
     {% endif %}
-    {% if entity_type %}
-    <p>Typ jednostki: {{ entity_type }}</p>
     {% endif %}
-    {% if period_from and period_to %}
-    <p>Okres: {{ period_from }} - {{ period_to }}</p>
-    {% endif %}
-    <p>
-        <a href="{{ download_url }}" role="button">
-            Pobierz plik XLSX
-        </a>
-    </p>
+
+    <!-- Sekcja pobierania -->
+    <div class="download-section">
+        <h4>Pobierz pliki</h4>
+
+        <!-- Przycisk pobierania XLSX -->
+        <div class="download-buttons">
+            <a href="{{ download_url }}" role="button" class="download-btn primary">
+                Pobierz XLSX
+            </a>
+
+            <!-- Załączniki -->
+            {% if attachments and attachments|length > 0 %}
+            <div class="attachments-section">
+                <p class="attachments-title">Załączniki ({{ attachments|length }}):</p>
+
+                {% for att in attachments %}
+                <a href="/api/convert/attachment/{{ conversion_id }}/{{ att.id }}" role="button" class="download-btn outline">
+                    Pobierz: {{ att.original_name }} ({{ att.size_kb }} KB)
+                </a>
+                {% endfor %}
+
+                {% if attachments|length > 1 %}
+                <a href="/api/convert/attachments/{{ conversion_id }}" role="button" class="download-btn secondary">
+                    Pobierz wszystkie załączniki (ZIP)
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+<style>
+    .conversion-result {
+        margin-top: 1rem;
+    }
+
+    .preview-section {
+        margin-bottom: 1rem;
+        border: 1px solid var(--pico-muted-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 0;
+    }
+
+    .preview-section summary {
+        padding: 0.75rem 1rem;
+        background-color: var(--pico-card-sectioning-background-color);
+        cursor: pointer;
+        border-radius: var(--pico-border-radius);
+    }
+
+    .preview-section[open] summary {
+        border-bottom: 1px solid var(--pico-muted-border-color);
+        border-radius: var(--pico-border-radius) var(--pico-border-radius) 0 0;
+    }
+
+    .preview-table {
+        margin: 0;
+        font-size: 0.875rem;
+    }
+
+    .preview-table th {
+        width: 180px;
+        text-align: left;
+        font-weight: 600;
+        background-color: var(--pico-card-sectioning-background-color);
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .bilans-preview th,
+    .bilans-preview td {
+        padding: 0.5rem;
+    }
+
+    .bilans-preview .text-right {
+        text-align: right;
+        font-family: monospace;
+    }
+
+    .bilans-preview .level-0 td:first-child {
+        font-weight: bold;
+    }
+
+    .bilans-preview .level-1 td:first-child {
+        padding-left: 1.5rem;
+    }
+
+    .bilans-preview .level-2 td:first-child {
+        padding-left: 3rem;
+    }
+
+    .bilans-preview .level-3 td:first-child {
+        padding-left: 4.5rem;
+    }
+
+    .preview-note {
+        font-size: 0.875rem;
+        color: var(--pico-muted-color);
+        text-align: center;
+        padding: 0.5rem;
+        margin: 0;
+    }
+
+    .download-section {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background-color: var(--pico-card-sectioning-background-color);
+        border-radius: var(--pico-border-radius);
+    }
+
+    .download-section h4 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+
+    .download-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .download-btn {
+        display: inline-block;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .download-btn.primary {
+        background-color: var(--pico-primary);
+        color: white;
+    }
+
+    .download-btn.secondary {
+        background-color: var(--pico-secondary);
+    }
+
+    .download-btn.outline {
+        background-color: transparent;
+        border: 1px solid var(--pico-muted-border-color);
+    }
+
+    .attachments-section {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--pico-muted-border-color);
+    }
+
+    .attachments-title {
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+
+    .status-success {
+        color: #155724;
+        font-weight: bold;
+    }
+
+    .status-error {
+        color: #721c24;
+        font-weight: bold;
+    }
+</style>
 {% else %}
 <div class="alert alert-error">
     <p><strong>Błąd konwersji</strong></p>

@@ -1,13 +1,15 @@
 """
 Uproszczony konwerter dla wersji webowej.
 Generuje tylko 2 arkusze: Bilans i RZiS.
+Obsługuje załączniki i jednostkę walutową (PLN / tys. PLN).
 """
 
 import sys
+import uuid
 from pathlib import Path
 from datetime import date
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -18,7 +20,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from parser import SFParser
-from models import Sprawozdanie, PozycjaFinansowa
+from models import Sprawozdanie, PozycjaFinansowa, Zalacznik
 
 
 class SimpleXLSXConverter:
@@ -28,14 +30,16 @@ class SimpleXLSXConverter:
     HEADER_FILL = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     TITLE_FONT = Font(bold=True, size=12)
     MONEY_FORMAT = '#,##0.00'
+    MONEY_FORMAT_TYS = '#,##0.00" tys."'
 
-    def convert(self, xml_path: Path, output_path: Path) -> dict:
+    def convert(self, xml_path: Path, output_path: Path, attachments_dir: Optional[Path] = None) -> dict:
         """
         Konwertuje plik XML do uproszczonego XLSX.
 
         Args:
             xml_path: Ścieżka do pliku XML
             output_path: Ścieżka do pliku wyjściowego XLSX
+            attachments_dir: Katalog na zapisanie załączników (opcjonalnie)
 
         Returns:
             dict z metadanymi sprawozdania
@@ -43,6 +47,10 @@ class SimpleXLSXConverter:
         # Parsuj XML
         parser = SFParser()
         spr = parser.parse(xml_path)
+
+        # Określ jednostkę walutową
+        self.jednostka_walutowa = spr.metadane.jednostka_walutowa
+        self.money_format = self.MONEY_FORMAT_TYS if self.jednostka_walutowa == "tys. PLN" else self.MONEY_FORMAT
 
         # Utwórz workbook
         wb = Workbook()
@@ -60,18 +68,114 @@ class SimpleXLSXConverter:
         # Zapisz
         wb.save(output_path)
 
+        # Zapisz załączniki jeśli są i podano katalog
+        saved_attachments = []
+        if attachments_dir and spr.zalaczniki:
+            saved_attachments = self._save_attachments(spr.zalaczniki, attachments_dir)
+
         # Generuj czytelną nazwę pliku
         readable_filename = self._generate_filename(spr)
+
+        # Generuj dane do podglądu
+        preview_data = self._generate_preview(spr)
 
         # Zwróć metadane
         return {
             "company_name": spr.dane_firmy.nazwa,
             "company_nip": spr.dane_firmy.nip,
+            "company_krs": spr.dane_firmy.krs,
+            "company_regon": spr.dane_firmy.regon,
+            "company_address": spr.dane_firmy.adres_pelny(),
             "entity_type": spr.metadane.typ_jednostki,
             "period_from": spr.metadane.okres_od,
             "period_to": spr.metadane.okres_do,
+            "data_sporzadzenia": spr.metadane.data_sporzadzenia,
+            "jednostka_walutowa": spr.metadane.jednostka_walutowa,
+            "wariant_rzis": spr.metadane.wariant_rzis,
             "output_filename": readable_filename,
+            "attachments": saved_attachments,
+            "preview": preview_data,
         }
+
+    def _save_attachments(self, zalaczniki: List[Zalacznik], attachments_dir: Path) -> List[Dict[str, Any]]:
+        """Zapisuje załączniki do plików i zwraca ich metadane."""
+        saved = []
+        for zal in zalaczniki:
+            # Generuj unikalny identyfikator dla pliku
+            unique_id = str(uuid.uuid4())
+            # Zachowaj oryginalne rozszerzenie
+            ext = zal.rozszerzenie() or "bin"
+            safe_filename = f"{unique_id}.{ext}"
+            file_path = attachments_dir / safe_filename
+
+            # Zapisz plik
+            file_path.write_bytes(zal.zawartosc)
+
+            saved.append({
+                "id": unique_id,
+                "original_name": zal.nazwa_pliku,
+                "safe_filename": safe_filename,
+                "path": str(file_path),
+                "size_kb": round(zal.rozmiar_kb(), 2),
+                "extension": ext,
+                "sekcja": zal.sekcja,
+                "opis": zal.opis,
+            })
+
+        return saved
+
+    def _generate_preview(self, spr: Sprawozdanie) -> Dict[str, Any]:
+        """Generuje dane do podglądu konwersji."""
+        # Dane ogólne
+        general_info = {
+            "firma": spr.dane_firmy.nazwa,
+            "nip": spr.dane_firmy.nip,
+            "krs": spr.dane_firmy.krs,
+            "regon": spr.dane_firmy.regon,
+            "adres": spr.dane_firmy.adres_pelny(),
+            "okres": f"{spr.metadane.okres_od} - {spr.metadane.okres_do}",
+            "typ_jednostki": spr.metadane.typ_jednostki,
+            "jednostka_walutowa": spr.metadane.jednostka_walutowa,
+            "wariant_rzis": "porównawczy" if spr.metadane.wariant_rzis == "porownawczy" else "kalkulacyjny",
+        }
+
+        # Weryfikacja sum
+        weryfikacja = None
+        if spr.weryfikacja:
+            weryfikacja = {
+                "aktywa_biezacy": self._format_kwota(spr.weryfikacja.aktywa_razem_biezacy),
+                "pasywa_biezacy": self._format_kwota(spr.weryfikacja.pasywa_razem_biezacy),
+                "zgodnosc": spr.weryfikacja.aktywa_rowne_pasywom_biezacy,
+            }
+
+        # Pierwsze 20 wierszy bilansu (aktywa + pasywa razem)
+        bilans_preview = []
+        all_bilans = spr.bilans_aktywa + spr.bilans_pasywa
+        for i, poz in enumerate(all_bilans[:20]):
+            bilans_preview.append({
+                "lp": i + 1,
+                "pozycja": poz.opis,
+                "kwota_biezaca": self._format_kwota(poz.kwota_biezaca),
+                "kwota_poprzednia": self._format_kwota(poz.kwota_poprzednia),
+                "poziom": poz.poziom,
+            })
+
+        return {
+            "general": general_info,
+            "weryfikacja": weryfikacja,
+            "bilans": bilans_preview,
+            "bilans_total": len(all_bilans),
+            "rzis_total": len(spr.rzis),
+            "attachments_count": len(spr.zalaczniki),
+        }
+
+    def _format_kwota(self, kwota: Optional[Decimal]) -> str:
+        """Formatuje kwotę z polskim formatem (przecinek jako separator dziesiętny)."""
+        if kwota is None:
+            return "-"
+        # Formatuj z 2 miejscami po przecinku i spacjami jako separatorami tysięcy
+        formatted = f"{kwota:,.2f}".replace(",", " ").replace(".", ",")
+        return formatted
 
     def _generate_filename(self, spr: Sprawozdanie) -> str:
         """Generuje czytelną nazwę pliku wyjściowego."""
@@ -94,6 +198,7 @@ class SimpleXLSXConverter:
         meta = spr.metadane
         firma = spr.dane_firmy
         weryfikacja = spr.weryfikacja
+        jednostka = meta.jednostka_walutowa
 
         # Nagłówek
         ws['A1'] = "BILANS"
@@ -119,6 +224,10 @@ class SimpleXLSXConverter:
         ws[f'A{row}'] = "Typ jednostki:"
         ws[f'B{row}'] = meta.typ_jednostki
 
+        row += 1
+        ws[f'A{row}'] = "Jednostka walutowa:"
+        ws[f'B{row}'] = jednostka
+
         # Weryfikacja sum
         row += 2
         ws[f'A{row}'] = "Weryfikacja sum:"
@@ -132,8 +241,8 @@ class SimpleXLSXConverter:
         # Nagłówki kolumn
         row += 2
         ws[f'A{row}'] = "Pozycja"
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
+        ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
+        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
 
         for col in ['A', 'B', 'C']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -166,6 +275,7 @@ class SimpleXLSXConverter:
         """Tworzy arkusz RZiS."""
         meta = spr.metadane
         firma = spr.dane_firmy
+        jednostka = meta.jednostka_walutowa
 
         # Nagłówek
         wariant_nazwa = "WARIANT PORÓWNAWCZY" if meta.wariant_rzis == "porownawczy" else "WARIANT KALKULACYJNY"
@@ -179,11 +289,14 @@ class SimpleXLSXConverter:
         ws['A3'] = "Okres:"
         ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
 
+        ws['A4'] = "Jednostka walutowa:"
+        ws['B4'] = jednostka
+
         # Nagłówki kolumn
-        row = 5
+        row = 6
         ws[f'A{row}'] = "Pozycja"
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
+        ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
+        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
 
         for col in ['A', 'B', 'C']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -213,28 +326,30 @@ class SimpleXLSXConverter:
         if poz.kwota_biezaca is not None:
             cell = ws[f'B{row}']
             cell.value = float(poz.kwota_biezaca)
-            cell.number_format = self.MONEY_FORMAT
+            cell.number_format = self.money_format
             cell.alignment = Alignment(horizontal='right')
 
         if poz.kwota_poprzednia is not None:
             cell = ws[f'C{row}']
             cell.value = float(poz.kwota_poprzednia)
-            cell.number_format = self.MONEY_FORMAT
+            cell.number_format = self.money_format
             cell.alignment = Alignment(horizontal='right')
 
         return row + 1
 
 
-def convert_file(xml_path: str, output_path: str) -> dict:
+def convert_file(xml_path: str, output_path: str, attachments_dir: Optional[str] = None) -> dict:
     """
     Funkcja pomocnicza do konwersji.
 
     Args:
         xml_path: Ścieżka do pliku XML
         output_path: Ścieżka do pliku XLSX
+        attachments_dir: Katalog na załączniki (opcjonalnie)
 
     Returns:
         dict z metadanymi sprawozdania
     """
     converter = SimpleXLSXConverter()
-    return converter.convert(Path(xml_path), Path(output_path))
+    attach_path = Path(attachments_dir) if attachments_dir else None
+    return converter.convert(Path(xml_path), Path(output_path), attach_path)

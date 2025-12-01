@@ -63,6 +63,9 @@ class Conversion(Base):
         DateTime, server_default=func.now()
     )
 
+    # Załączniki (JSON)
+    attachments_json: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
+
     # Relacja do użytkownika
     user: Mapped["User"] = relationship(back_populates="conversions")
 

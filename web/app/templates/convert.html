@@ -2,6 +2,12 @@
 
 {% block title %}Konwertuj sprawozdanie - Konwerter SF{% endblock %}
 
+{% block head_extra %}
+{% if recaptcha_enabled %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <article>
     <header>
@@ -43,6 +49,12 @@
             <p id="selected-file" class="selected-file"></p>
             <p class="upload-hint">Akceptowane formaty: XML, XAdES (max 10 MB)</p>
         </div>
+
+        {% if recaptcha_enabled %}
+        <div class="recaptcha-container">
+            <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+        </div>
+        {% endif %}
 
         <button type="submit" id="submit-btn" class="convert-btn">
             <span id="upload-indicator" class="htmx-indicator">
@@ -161,6 +173,12 @@
     .convert-btn .btn-text {
         display: inline-block;
     }
+
+    .recaptcha-container {
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: center;
+    }
 </style>
 
 <script>
@@ -217,6 +235,10 @@
             // Wyczyść wybór pliku
             fileInput.value = '';
             selectedFileDisplay.classList.remove('show');
+            // Reset reCAPTCHA jeśli istnieje
+            if (typeof grecaptcha !== 'undefined') {
+                grecaptcha.reset();
+            }
         }
     });
 </script>
