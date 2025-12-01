@@ -12,12 +12,14 @@ from pathlib import Path
 from typing import Optional
 from lxml import etree
 
+import base64
 from models import (
     MetadaneSprawozdania,
     DaneFirmy,
     PozycjaFinansowa,
     WynikWeryfikacji,
     Sprawozdanie,
+    Zalacznik,
 )
 from mappings import get_opis, calculate_poziom
 
@@ -90,6 +92,15 @@ class SFParser:
         # Parsuj notę podatkową (jeśli istnieje)
         nota_podatkowa = self._parse_nota_podatkowa(typ_jednostki)
 
+        # Parsuj zestawienie zmian w kapitale własnym (jeśli istnieje)
+        zestawienie_zmian_kapital = self._parse_zestawienie_zmian_kapital(typ_jednostki)
+
+        # Parsuj rachunek przepływów pieniężnych (jeśli istnieje)
+        rachunek_przeplywow, wariant_przeplywow = self._parse_rachunek_przeplywow(typ_jednostki)
+
+        # Parsuj załączniki binarne (jeśli istnieją)
+        zalaczniki = self._parse_zalaczniki()
+
         # Weryfikacja sum
         weryfikacja = self._verify_sums(bilans_aktywa, bilans_pasywa)
 
@@ -100,6 +111,10 @@ class SFParser:
             bilans_pasywa=bilans_pasywa,
             rzis=rzis,
             nota_podatkowa=nota_podatkowa,
+            zestawienie_zmian_kapital=zestawienie_zmian_kapital,
+            rachunek_przeplywow=rachunek_przeplywow,
+            wariant_przeplywow=wariant_przeplywow,
+            zalaczniki=zalaczniki,
             weryfikacja=weryfikacja,
         )
 
@@ -268,6 +283,9 @@ class SFParser:
         # Wykryj wariant RZiS
         wariant_rzis = self._detect_rzis_variant()
 
+        # Wykryj jednostkę walutową (PLN lub tys. PLN)
+        jednostka_walutowa = self._detect_currency_unit()
+
         return MetadaneSprawozdania(
             typ_jednostki=typ_jednostki,
             wersja_schematu=wersja_schematu,
@@ -275,6 +293,7 @@ class SFParser:
             okres_do=okres_do or date.today(),
             data_sporzadzenia=data_sporzadzenia,
             wariant_rzis=wariant_rzis,
+            jednostka_walutowa=jednostka_walutowa,
         )
 
     def _detect_rzis_variant(self) -> str:
@@ -295,6 +314,29 @@ class SFParser:
 
         # Domyślnie porównawczy
         return "porownawczy"
+
+    def _detect_currency_unit(self) -> str:
+        """Wykrywa jednostkę walutową (PLN lub tys. PLN).
+
+        Sprawozdania w wariancie WTysiacach mają:
+        - Element główny zawierający "WTys" w nazwie
+        - Lub namespace zawierający "WTysiacach"
+
+        Returns:
+            "PLN" lub "tys. PLN"
+        """
+        # Sprawdź nazwę elementu głównego
+        tag = etree.QName(self.root).localname
+        if "WTys" in tag:
+            return "tys. PLN"
+
+        # Sprawdź namespace elementu głównego
+        ns = etree.QName(self.root).namespace or ""
+        if "WTysiacach" in ns or "WTys" in ns:
+            return "tys. PLN"
+
+        # Domyślnie PLN (wariant WZlotych)
+        return "PLN"
 
     def _parse_company_info(self, typ_jednostki: str) -> DaneFirmy:
         """Parsuje dane firmy."""
@@ -503,6 +545,80 @@ class SFParser:
 
         return pozycje if pozycje else None
 
+    def _parse_zestawienie_zmian_kapital(self, typ_jednostki: str) -> Optional[list]:
+        """Parsuje Zestawienie zmian w kapitale własnym."""
+        pozycje = []
+
+        # Szukaj sekcji Zestawienie zmian w kapitale
+        zest_elem = None
+        for elem in self.root.iter():
+            localname = self._safe_localname(elem)
+            if not localname:
+                continue
+            if "ZestZmianWKapitale" in localname:
+                zest_elem = elem
+                break
+
+        if zest_elem is None:
+            return None
+
+        # Parsuj rekurencyjnie
+        pozycje = self._extract_positions_recursive(
+            zest_elem, "ZestZmianWKapitale", typ_jednostki, ""
+        )
+
+        return pozycje if pozycje else None
+
+    def _parse_rachunek_przeplywow(self, typ_jednostki: str) -> tuple:
+        """Parsuje Rachunek przepływów pieniężnych.
+
+        Returns:
+            Tuple (lista pozycji, wariant: "bezposredni" lub "posredni")
+        """
+        pozycje = []
+        wariant = "posredni"
+
+        # Szukaj sekcji Rachunek przepływów
+        rach_elem = None
+        for elem in self.root.iter():
+            localname = self._safe_localname(elem)
+            if not localname:
+                continue
+
+            # Sprawdź wariant
+            if localname == "PrzeplywyBezp":
+                rach_elem = elem
+                wariant = "bezposredni"
+                break
+            elif localname == "PrzeplywyPosr":
+                rach_elem = elem
+                wariant = "posredni"
+                break
+            elif "RachPrzeplywow" in localname:
+                # Główny kontener - szukaj w dzieciach
+                for child in elem:
+                    child_name = self._safe_localname(child)
+                    if child_name == "PrzeplywyBezp":
+                        rach_elem = child
+                        wariant = "bezposredni"
+                        break
+                    elif child_name == "PrzeplywyPosr":
+                        rach_elem = child
+                        wariant = "posredni"
+                        break
+                if rach_elem is not None:
+                    break
+
+        if rach_elem is None:
+            return None, wariant
+
+        # Parsuj rekurencyjnie
+        pozycje = self._extract_positions_recursive(
+            rach_elem, "RachPrzeplywow", typ_jednostki, ""
+        )
+
+        return (pozycje if pozycje else None), wariant
+
     def _extract_positions_recursive(
         self,
         element,
@@ -598,6 +714,87 @@ class SFParser:
             pozycje.extend(child_positions)
 
         return pozycje
+
+    def _parse_zalaczniki(self) -> list:
+        """Parsuje załączniki binarne z dokumentu XML.
+
+        Struktura załącznika w XML (zgodna ze schematem XSD):
+        <DodatkoweInformacjeIObjasnienia>
+            <Opis>Opis załącznika</Opis>
+            <Plik>
+                <Nazwa>nazwa_pliku.pdf</Nazwa>
+                <Zawartosc>base64-encoded-content</Zawartosc>
+            </Plik>
+        </DodatkoweInformacjeIObjasnienia>
+
+        Returns:
+            Lista załączników (Zalacznik objects)
+        """
+        zalaczniki = []
+
+        # Szukaj elementów zawierających załączniki
+        # Możliwe miejsca: DodatkoweInformacjeIObjasnienia, InformacjeUzupelniajaceDoBilansu
+        sekcje_z_zalacznikami = [
+            "DodatkoweInformacjeIObjasnienia",
+            "InformacjeUzupelniajaceDoBilansu",
+            "InformacjaDodatkowa",
+        ]
+
+        for elem in self.root.iter():
+            localname = self._safe_localname(elem)
+            if not localname:
+                continue
+
+            # Sprawdź czy to sekcja z potencjalnymi załącznikami
+            is_attachment_section = any(
+                sekcja in localname for sekcja in sekcje_z_zalacznikami
+            )
+
+            if not is_attachment_section:
+                continue
+
+            # Szukaj elementu Plik wewnątrz sekcji
+            opis = ""
+            sekcja_nazwa = localname
+
+            for child in elem:
+                child_name = self._safe_localname(child)
+                if not child_name:
+                    continue
+
+                # Pobierz opis
+                if child_name == "Opis" and child.text:
+                    opis = child.text.strip()
+
+                # Znajdź element Plik
+                if child_name == "Plik":
+                    nazwa_pliku = None
+                    zawartosc_base64 = None
+
+                    for plik_child in child:
+                        plik_child_name = self._safe_localname(plik_child)
+                        if not plik_child_name:
+                            continue
+                        if plik_child_name == "Nazwa" and plik_child.text:
+                            nazwa_pliku = plik_child.text.strip()
+                        elif plik_child_name == "Zawartosc" and plik_child.text:
+                            zawartosc_base64 = plik_child.text.strip()
+
+                    # Jeśli mamy nazwę i zawartość, dekoduj i dodaj załącznik
+                    if nazwa_pliku and zawartosc_base64:
+                        try:
+                            zawartosc = base64.b64decode(zawartosc_base64)
+                            zalaczniki.append(Zalacznik(
+                                nazwa_pliku=nazwa_pliku,
+                                zawartosc=zawartosc,
+                                sekcja=sekcja_nazwa,
+                                opis=opis,
+                            ))
+                        except (ValueError, base64.binascii.Error) as e:
+                            # Błąd dekodowania base64 - pomijamy załącznik
+                            print(f"Ostrzeżenie: Nie można zdekodować załącznika {nazwa_pliku}: {e}")
+
+        return zalaczniki
 
     def _verify_sums(self, aktywa: list, pasywa: list) -> WynikWeryfikacji:
         """Weryfikuje czy Aktywa = Pasywa."""

@@ -322,9 +322,16 @@ class SFConverterGUI:
                 sprawozdanie = self.sf_parser.parse(path)
 
                 # Konwersja
-                output_path = self.converter.convert(sprawozdanie, output_dir)
+                output_path, attachments = self.converter.convert(sprawozdanie, output_dir)
 
                 self._log(f"  ✓ Zapisano: {output_path.name}", "success")
+
+                # Informacja o załącznikach
+                if attachments:
+                    self._log(f"    → Zapisano {len(attachments)} załącznik(ów):", "info")
+                    for att_path in attachments:
+                        self._log(f"      • {att_path.name}", "info")
+
                 success_count += 1
 
             except Exception as e:

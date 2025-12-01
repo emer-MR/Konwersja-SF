@@ -4,7 +4,8 @@
 Generator mapowań pozycji finansowych na podstawie plików XSD.
 
 Parsuje schematy XSD Ministerstwa Finansów i generuje kompletny plik mappings.py
-z opisami wszystkich pozycji Bilansu i RZiS dla jednostek Mikro, Mała, Inna.
+z opisami wszystkich pozycji Bilansu, RZiS, Zestawienia zmian w kapitale
+i Rachunku przepływów pieniężnych dla jednostek Mikro, Mała, Inna.
 """
 
 from lxml import etree
@@ -25,6 +26,9 @@ def parse_xsd_properly(xsd_path):
         'RZiS_Por': {},
         'RZiS_Kalk': {},
         'RZiS_Mikro': {},  # Specjalny RZiS dla jednostek Mikro
+        'ZestZmianWKapitale': {},  # Zestawienie zmian w kapitale własnym
+        'RachPrzeplywow_Bezp': {},  # Rachunek przepływów - metoda bezpośrednia
+        'RachPrzeplywow_Posr': {},  # Rachunek przepływów - metoda pośrednia
     }
 
     def get_doc(elem):
@@ -46,6 +50,46 @@ def parse_xsd_properly(xsd_path):
                     doc = get_doc(elem)
                     if doc:
                         result['RZiS_Mikro'][elem_name] = doc
+
+        # Zestawienie zmian w kapitale własnym
+        if 'ZestZmianWKapitale' in ct_name:
+            for elem in ct.iter('{http://www.w3.org/2001/XMLSchema}element'):
+                elem_name = elem.get('name')
+                if elem_name and not elem_name.startswith('PozycjaUszczegolawiajaca'):
+                    doc = get_doc(elem)
+                    if doc:
+                        result['ZestZmianWKapitale'][elem_name] = doc
+
+        # Rachunek przepływów pieniężnych
+        if 'RachPrzeplywow' in ct_name:
+            for elem in ct.iter('{http://www.w3.org/2001/XMLSchema}element'):
+                elem_name = elem.get('name')
+                if elem_name and not elem_name.startswith('PozycjaUszczegolawiajaca'):
+                    doc = get_doc(elem)
+                    if doc:
+                        # Sprawdź czy to metoda bezpośrednia czy pośrednia
+                        parent_elem = elem.getparent()
+                        is_bezp = False
+                        is_posr = False
+                        while parent_elem is not None:
+                            parent_name = parent_elem.get('name') or ''
+                            if parent_name == 'PrzeplywyBezp':
+                                is_bezp = True
+                                break
+                            elif parent_name == 'PrzeplywyPosr':
+                                is_posr = True
+                                break
+                            parent_elem = parent_elem.getparent()
+
+                        if is_bezp:
+                            result['RachPrzeplywow_Bezp'][elem_name] = doc
+                        elif is_posr:
+                            result['RachPrzeplywow_Posr'][elem_name] = doc
+                        else:
+                            # Dla elementów na poziomie głównym (bez rozróżnienia metody)
+                            # dodaj do obu słowników
+                            result['RachPrzeplywow_Bezp'][elem_name] = doc
+                            result['RachPrzeplywow_Posr'][elem_name] = doc
 
         # Znajdź elementy RZiSPor i RZiSKalk (są to choice)
         for elem in ct.findall('.//xsd:element', ns):
@@ -257,6 +301,48 @@ def generate_mappings_py(positions_by_unit: dict) -> str:
             lines.append('}')
             lines.append('')
 
+        # Zestawienie zmian w kapitale własnym (tylko dla Inna - najbardziej kompletne)
+        zest_zmian = positions.get('ZestZmianWKapitale', {})
+        if zest_zmian and unit_type == 'Inna':
+            var_name = 'ZESTAWIENIE_ZMIAN_W_KAPITALE'
+            lines.append(f'{var_name} = {{')
+            for kod in sorted(zest_zmian.keys(), key=sort_key):
+                opis = zest_zmian[kod]
+                formatted = format_opis_rzis(kod, opis)  # Używamy tego samego formatowania
+                formatted = formatted.replace('"', '\\"')
+                formatted = formatted.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                lines.append(f'    "{kod}": "{formatted}",')
+            lines.append('}')
+            lines.append('')
+
+        # Rachunek przepływów pieniężnych - metoda bezpośrednia (tylko dla Inna)
+        rach_bezp = positions.get('RachPrzeplywow_Bezp', {})
+        if rach_bezp and unit_type == 'Inna':
+            var_name = 'RACHUNEK_PRZEPLYWOW_BEZPOSREDNI'
+            lines.append(f'{var_name} = {{')
+            for kod in sorted(rach_bezp.keys(), key=sort_key):
+                opis = rach_bezp[kod]
+                formatted = format_opis_rzis(kod, opis)
+                formatted = formatted.replace('"', '\\"')
+                formatted = formatted.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                lines.append(f'    "{kod}": "{formatted}",')
+            lines.append('}')
+            lines.append('')
+
+        # Rachunek przepływów pieniężnych - metoda pośrednia (tylko dla Inna)
+        rach_posr = positions.get('RachPrzeplywow_Posr', {})
+        if rach_posr and unit_type == 'Inna':
+            var_name = 'RACHUNEK_PRZEPLYWOW_POSREDNI'
+            lines.append(f'{var_name} = {{')
+            for kod in sorted(rach_posr.keys(), key=sort_key):
+                opis = rach_posr[kod]
+                formatted = format_opis_rzis(kod, opis)
+                formatted = formatted.replace('"', '\\"')
+                formatted = formatted.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                lines.append(f'    "{kod}": "{formatted}",')
+            lines.append('}')
+            lines.append('')
+
     # Nota podatkowa
     lines.append('# ' + '='*77)
     lines.append('# NOTA PODATKOWA')
@@ -402,6 +488,9 @@ def main():
             'RZiS_Por': {},
             'RZiS_Kalk': {},
             'RZiS_Mikro': {},
+            'ZestZmianWKapitale': {},
+            'RachPrzeplywow_Bezp': {},
+            'RachPrzeplywow_Posr': {},
         }
 
         # Parsuj każdą wersję schematu
@@ -415,7 +504,8 @@ def main():
                 positions = parse_xsd_properly(xsd_path)
 
                 # Łącz z poprzednimi wersjami
-                for section in ['Bilans_Aktywa', 'Bilans_Pasywa', 'RZiS_Por', 'RZiS_Kalk', 'RZiS_Mikro']:
+                for section in ['Bilans_Aktywa', 'Bilans_Pasywa', 'RZiS_Por', 'RZiS_Kalk', 'RZiS_Mikro',
+                                'ZestZmianWKapitale', 'RachPrzeplywow_Bezp', 'RachPrzeplywow_Posr']:
                     old_count = len(merged[section])
                     merged[section] = merge_positions(merged[section], positions.get(section, {}))
                     new_count = len(merged[section])
@@ -432,6 +522,12 @@ def main():
         print(f'    RZiS Kalk: {len(merged["RZiS_Kalk"])} pozycji')
         if merged["RZiS_Mikro"]:
             print(f'    RZiS Mikro: {len(merged["RZiS_Mikro"])} pozycji')
+        if merged["ZestZmianWKapitale"]:
+            print(f'    Zest. zmian w kapitale: {len(merged["ZestZmianWKapitale"])} pozycji')
+        if merged["RachPrzeplywow_Bezp"]:
+            print(f'    Rach. przepływów (bezp.): {len(merged["RachPrzeplywow_Bezp"])} pozycji')
+        if merged["RachPrzeplywow_Posr"]:
+            print(f'    Rach. przepływów (pośr.): {len(merged["RachPrzeplywow_Posr"])} pozycji')
 
         positions_by_unit[unit_type] = merged
 

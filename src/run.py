@@ -117,9 +117,16 @@ def run_cli(args):
             print(f"Przetwarzanie: {file_path.name}")
 
             sprawozdanie = sf_parser.parse(file_path)
-            output_path = converter.convert(sprawozdanie, output_dir)
+            output_path, attachments = converter.convert(sprawozdanie, output_dir)
 
             print(f"  [OK] Zapisano: {output_path.name}")
+
+            # Informacja o załącznikach
+            if attachments:
+                print(f"       Załączniki ({len(attachments)}):")
+                for att_path in attachments:
+                    print(f"       • {att_path.name}")
+
             success += 1
 
         except Exception as e:

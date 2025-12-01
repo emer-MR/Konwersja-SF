@@ -17,6 +17,7 @@ class MetadaneSprawozdania:
     okres_do: date
     data_sporzadzenia: Optional[date] = None
     wariant_rzis: str = "porownawczy"  # "porownawczy" lub "kalkulacyjny"
+    jednostka_walutowa: str = "PLN"  # "PLN" lub "tys. PLN" (WTysiacach)
 
 
 @dataclass
@@ -54,6 +55,25 @@ class DaneFirmy:
         elif self.miejscowosc:
             parts.append(self.miejscowosc)
         return ", ".join(parts) if parts else ""
+
+
+@dataclass
+class Zalacznik:
+    """Załącznik binarny zawarty w sprawozdaniu finansowym."""
+    nazwa_pliku: str              # Oryginalna nazwa pliku (np. "informacja_dodatkowa.pdf")
+    zawartosc: bytes              # Zdekodowane dane binarne
+    sekcja: str = ""              # Sekcja, z której pochodzi załącznik
+    opis: str = ""                # Opis załącznika z XML
+
+    def rozszerzenie(self) -> str:
+        """Zwraca rozszerzenie pliku."""
+        if "." in self.nazwa_pliku:
+            return self.nazwa_pliku.rsplit(".", 1)[-1].lower()
+        return ""
+
+    def rozmiar_kb(self) -> float:
+        """Zwraca rozmiar w KB."""
+        return len(self.zawartosc) / 1024
 
 
 @dataclass
@@ -107,6 +127,10 @@ class Sprawozdanie:
     bilans_pasywa: list[PozycjaFinansowa] = field(default_factory=list)
     rzis: list[PozycjaFinansowa] = field(default_factory=list)
     nota_podatkowa: Optional[list[PozycjaFinansowa]] = None
+    zestawienie_zmian_kapital: Optional[list[PozycjaFinansowa]] = None  # Zestawienie zmian w kapitale własnym
+    rachunek_przeplywow: Optional[list[PozycjaFinansowa]] = None  # Rachunek przepływów pieniężnych
+    wariant_przeplywow: str = "posredni"  # "bezposredni" lub "posredni"
+    zalaczniki: list[Zalacznik] = field(default_factory=list)  # Załączniki binarne (PDF, DOC, itp.)
     weryfikacja: Optional[WynikWeryfikacji] = None
 
     def wszystkie_pozycje(self) -> list[PozycjaFinansowa]:
@@ -114,6 +138,10 @@ class Sprawozdanie:
         pozycje = self.bilans_aktywa + self.bilans_pasywa + self.rzis
         if self.nota_podatkowa:
             pozycje += self.nota_podatkowa
+        if self.zestawienie_zmian_kapital:
+            pozycje += self.zestawienie_zmian_kapital
+        if self.rachunek_przeplywow:
+            pozycje += self.rachunek_przeplywow
         return pozycje
 
     def nazwa_pliku(self) -> str:
