@@ -18,9 +18,15 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
 # Dodaj ścieżkę do głównego modułu src
-SRC_PATH = Path(__file__).parent.parent.parent / "src"
-if str(SRC_PATH) not in sys.path:
-    sys.path.insert(0, str(SRC_PATH))
+# W Docker: /app/app/converter_simple.py -> /app/src
+# Lokalnie: web/app/converter_simple.py -> src
+SRC_PATH = Path(__file__).parent.parent / "src"  # dla Docker (/app/src)
+SRC_PATH_LOCAL = Path(__file__).parent.parent.parent / "src"  # dla lokalnego dev
+
+for path in [SRC_PATH, SRC_PATH_LOCAL]:
+    if path.exists() and str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+        break
 
 from parser import SFParser
 from models import Sprawozdanie, PozycjaFinansowa, Zalacznik
