@@ -4,6 +4,13 @@
 
 {% block content %}
 <article>
+    {% if home_page %}
+    <!-- Treść ze strony statycznej "home" -->
+    <div class="page-content">
+        {{ home_page.content | safe }}
+    </div>
+    {% else %}
+    <!-- Domyślna zawartość gdy brak strony "home" w bazie -->
     <header>
         <h1>Konwerter Sprawozdań Finansowych</h1>
         <p>Przekształć e-Sprawozdanie XML na czytelny plik Excel</p>
@@ -12,10 +19,11 @@
     <section>
         <h3>Co oferujemy?</h3>
         <ul>
-            <li><strong>Konwersja XML → XLSX</strong> - zamień plik e-Sprawozdania na Excel</li>
-            <li><strong>Bilans i RZiS</strong> - uporządkowane arkusze z danymi</li>
+            <li><strong>Konwersja XML na XLSX</strong> - zamień plik e-Sprawozdania na Excel</li>
+            <li><strong>Pełne sprawozdanie</strong> - Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale, Rachunek przepływów</li>
             <li><strong>Wszystkie typy jednostek</strong> - Mikro, Mała, Inna</li>
-            <li><strong>Bezpłatnie</strong> - do 10 konwersji dziennie</li>
+            <li><strong>Obsługa załączników</strong> - wyodrębnianie PDF i innych dokumentów</li>
+            <li><strong>Bezpłatnie</strong> - do {{ max_conversions or 10 }} konwersji dziennie</li>
         </ul>
     </section>
 
@@ -24,13 +32,18 @@
         <ol>
             <li>Zarejestruj się lub zaloguj</li>
             <li>Prześlij plik XML (e-Sprawozdanie)</li>
-            <li>Pobierz gotowy plik Excel</li>
+            <li>Pobierz gotowy plik Excel ze wszystkimi arkuszami</li>
         </ol>
     </section>
 
     <footer>
+        {% if user %}
+        <a href="/convert" role="button">Przejdź do konwertera</a>
+        {% else %}
         <a href="/register" role="button">Zarejestruj się</a>
         <a href="/login" role="button" class="outline">Zaloguj się</a>
+        {% endif %}
     </footer>
+    {% endif %}
 </article>
 {% endblock %}

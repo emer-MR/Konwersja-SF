@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel Admin{% endblock %} - Konwerter SF</title>
+
+    <!-- Pico CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+
+    <!-- Quill WYSIWYG Editor -->
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+
+    <style>
+        :root {
+            --pico-font-size: 15px;
+        }
+
+        body {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .admin-sidebar {
+            width: 220px;
+            background-color: var(--pico-card-background-color);
+            border-right: 1px solid var(--pico-muted-border-color);
+            padding: 1rem;
+            flex-shrink: 0;
+        }
+
+        .admin-sidebar h3 {
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+
+        .admin-sidebar nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .admin-sidebar nav li {
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-sidebar nav a {
+            display: block;
+            padding: 0.5rem 0.75rem;
+            text-decoration: none;
+            border-radius: var(--pico-border-radius);
+        }
+
+        .admin-sidebar nav a:hover {
+            background-color: var(--pico-secondary-background);
+        }
+
+        .admin-sidebar nav a.active {
+            background-color: var(--pico-primary);
+            color: white;
+        }
+
+        .admin-main {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .data-table {
+            width: 100%;
+            font-size: 0.9rem;
+        }
+
+        .data-table th {
+            text-align: left;
+            background-color: var(--pico-card-sectioning-background-color);
+        }
+
+        .data-table td, .data-table th {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+
+        .data-table .actions {
+            white-space: nowrap;
+        }
+
+        .data-table .actions a {
+            margin-right: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-help {
+            font-size: 0.85rem;
+            color: var(--pico-muted-color);
+            margin-top: 0.25rem;
+        }
+
+        /* Quill Editor styles */
+        .ql-container {
+            min-height: 300px;
+            font-size: 1rem;
+        }
+
+        .ql-editor {
+            min-height: 300px;
+        }
+
+        .editor-container {
+            margin-bottom: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--pico-card-background-color);
+            padding: 1.5rem;
+            border-radius: var(--pico-border-radius);
+            text-align: center;
+            border: 1px solid var(--pico-muted-border-color);
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--pico-primary);
+        }
+
+        .stat-card .stat-label {
+            color: var(--pico-muted-color);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            .admin-sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--pico-muted-border-color);
+            }
+
+            .admin-sidebar nav ul {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .admin-sidebar nav li {
+                margin-bottom: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <aside class="admin-sidebar">
+        <h3>Panel Admin</h3>
+        <nav>
+            <ul>
+                <li><a href="/admin" {% if request.url.path == '/admin' %}class="active"{% endif %}>Dashboard</a></li>
+                <li><a href="/admin/posts" {% if '/admin/posts' in request.url.path %}class="active"{% endif %}>Wpisy bloga</a></li>
+                <li><a href="/admin/categories" {% if '/admin/categories' in request.url.path %}class="active"{% endif %}>Kategorie</a></li>
+                <li><a href="/admin/pages" {% if '/admin/pages' in request.url.path %}class="active"{% endif %}>Strony statyczne</a></li>
+            </ul>
+        </nav>
+        <hr>
+        <nav>
+            <ul>
+                <li><a href="/">Strona glowna</a></li>
+                <li><a href="/blog">Blog</a></li>
+                <li><a href="/convert">Konwerter</a></li>
+                <li><a href="/logout">Wyloguj</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="admin-main">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

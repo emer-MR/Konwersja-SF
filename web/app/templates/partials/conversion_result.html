@@ -116,6 +116,51 @@
         {% endif %}
     </details>
     {% endif %}
+
+    <!-- Dostępne sekcje sprawozdania -->
+    {% if preview.sekcje %}
+    <details class="preview-section">
+        <summary><strong>Zawartość pliku XLSX</strong></summary>
+        <table class="preview-table">
+            <tbody>
+                <tr>
+                    <th>Bilans (Aktywa + Pasywa)</th>
+                    <td>{% if preview.sekcje.bilans %}<span class="status-success">TAK</span> ({{ preview.bilans_total }} pozycji){% else %}<span class="status-muted">-</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Rachunek Zysków i Strat</th>
+                    <td>{% if preview.sekcje.rzis %}<span class="status-success">TAK</span> ({{ preview.rzis_total }} pozycji){% else %}<span class="status-muted">-</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Nota podatkowa</th>
+                    <td>{% if preview.sekcje.nota_podatkowa %}<span class="status-success">TAK</span> ({{ preview.nota_total }} pozycji){% else %}<span class="status-muted">Brak w sprawozdaniu</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Zestawienie zmian w kapitale</th>
+                    <td>{% if preview.sekcje.zestawienie_zmian_kapital %}<span class="status-success">TAK</span> ({{ preview.kapital_total }} pozycji){% else %}<span class="status-muted">Brak w sprawozdaniu</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Rachunek przepływów pieniężnych</th>
+                    <td>{% if preview.sekcje.rachunek_przeplywow %}<span class="status-success">TAK</span> ({{ preview.przeplywy_total }} pozycji, {{ preview.wariant_przeplywow }}){% else %}<span class="status-muted">Brak w sprawozdaniu</span>{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Dane surowe</th>
+                    <td><span class="status-success">TAK</span> (wszystkie pozycje z kodami)</td>
+                </tr>
+                <tr>
+                    <th>Dane analityczne</th>
+                    <td><span class="status-success">TAK</span> (format długi do analizy)</td>
+                </tr>
+                {% if preview.attachments_count > 0 %}
+                <tr>
+                    <th>Załączniki binarne</th>
+                    <td><span class="status-success">TAK</span> ({{ preview.attachments_count }} plików)</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </details>
+    {% endif %}
     {% endif %}
 
     <!-- Sekcja pobierania -->
@@ -281,6 +326,11 @@
     .status-error {
         color: #721c24;
         font-weight: bold;
+    }
+
+    .status-muted {
+        color: var(--pico-muted-color);
+        font-style: italic;
     }
 </style>
 {% else %}

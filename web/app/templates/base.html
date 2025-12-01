@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
         }
@@ -35,12 +35,31 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         header .logo {
             font-size: 1.5rem;
             font-weight: bold;
             text-decoration: none;
+        }
+
+        header .nav-menu {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        header .nav-menu a {
+            padding: 0.25rem 0.75rem;
+            text-decoration: none;
+            border-radius: var(--pico-border-radius);
+        }
+
+        header .nav-menu a:hover {
+            background-color: var(--pico-secondary-background);
         }
 
         header .nav-links {
@@ -177,6 +196,67 @@
             font-size: 0.875rem;
             color: var(--pico-muted-color);
         }
+
+        /* Lepszy kontrast przycisków */
+        button:not(.outline),
+        [role="button"]:not(.outline),
+        input[type="submit"]:not(.outline),
+        input[type="button"]:not(.outline) {
+            background-color: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #fff !important;
+        }
+
+        button:not(.outline):hover,
+        [role="button"]:not(.outline):hover,
+        input[type="submit"]:not(.outline):hover,
+        input[type="button"]:not(.outline):hover {
+            background-color: #0b5ed7 !important;
+            border-color: #0b5ed7 !important;
+        }
+
+        /* Przyciski outline */
+        button.outline,
+        [role="button"].outline {
+            background-color: transparent !important;
+            color: #0d6efd !important;
+            border-color: #0d6efd !important;
+        }
+
+        button.outline:hover,
+        [role="button"].outline:hover {
+            background-color: #0d6efd !important;
+            color: #fff !important;
+        }
+
+        /* Przyciski secondary */
+        button.secondary,
+        [role="button"].secondary,
+        button.outline.secondary,
+        [role="button"].outline.secondary {
+            background-color: transparent !important;
+            color: #6c757d !important;
+            border-color: #6c757d !important;
+        }
+
+        button.secondary:hover,
+        [role="button"].secondary:hover,
+        button.outline.secondary:hover,
+        [role="button"].outline.secondary:hover {
+            background-color: #6c757d !important;
+            color: #fff !important;
+        }
+
+        /* Tagi z lepszym kontrastem */
+        .tag {
+            background-color: #495057 !important;
+            color: #fff !important;
+        }
+
+        .tag:hover {
+            background-color: #343a40 !important;
+            color: #fff !important;
+        }
     </style>
 </head>
 <body>
@@ -184,9 +264,24 @@
         <header>
             <nav>
                 <a href="/" class="logo">Konwerter SF</a>
+                <div class="nav-menu">
+                    <a href="/">Strona główna</a>
+                    <a href="/blog">Wiadomości</a>
+                    <a href="/convert">Konwerter</a>
+                    {% if menu_pages %}
+                        {% for page in menu_pages %}
+                            {% if page.slug != 'home' %}
+                            <a href="/strona/{{ page.slug }}">{{ page.title }}</a>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
                 <div class="nav-links">
                     {% if user %}
                         <span>{{ user.email }}</span>
+                        {% if user.is_admin %}
+                        <a href="/admin" role="button" class="outline">Admin</a>
+                        {% endif %}
                         <a href="/logout" role="button" class="outline secondary">Wyloguj</a>
                     {% else %}
                         <a href="/login">Zaloguj</a>
@@ -200,7 +295,7 @@
 
         <footer>
             <p>Konwerter Sprawozdań Finansowych XML &rarr; XLSX</p>
-            <p>Wersja uproszczona (Bilans + RZiS)</p>
+            <p>Pełna wersja (Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale, Rachunek przepływów)</p>
         </footer>
     </main>
 </body>

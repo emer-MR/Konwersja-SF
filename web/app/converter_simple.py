@@ -1,7 +1,10 @@
 """
-Uproszczony konwerter dla wersji webowej.
-Generuje tylko 2 arkusze: Bilans i RZiS.
+Pełny konwerter dla wersji webowej.
+Generuje arkusze: Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale,
+Rachunek przepływów pieniężnych, Dane surowe, Dane analityczne.
 Obsługuje załączniki i jednostkę walutową (PLN / tys. PLN).
+
+UWAGA: Arkusz "Analiza wskaźnikowa" jest dostępny tylko w wersji lokalnej (CLI).
 """
 
 import sys
@@ -24,17 +27,18 @@ from models import Sprawozdanie, PozycjaFinansowa, Zalacznik
 
 
 class SimpleXLSXConverter:
-    """Uproszczony konwerter - tylko Bilans i RZiS."""
+    """Pełny konwerter webowy - wszystkie sekcje sprawozdania finansowego."""
 
     HEADER_FONT = Font(bold=True)
     HEADER_FILL = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     TITLE_FONT = Font(bold=True, size=12)
     MONEY_FORMAT = '#,##0.00'
     MONEY_FORMAT_TYS = '#,##0.00" tys."'
+    DATE_FORMAT = 'YYYY-MM-DD'
 
     def convert(self, xml_path: Path, output_path: Path, attachments_dir: Optional[Path] = None) -> dict:
         """
-        Konwertuje plik XML do uproszczonego XLSX.
+        Konwertuje plik XML do pełnego XLSX z wszystkimi sekcjami sprawozdania.
 
         Args:
             xml_path: Ścieżka do pliku XML
@@ -64,6 +68,22 @@ class SimpleXLSXConverter:
         wariant = "w.por." if spr.metadane.wariant_rzis == "porownawczy" else "w.kalk."
         ws_rzis = wb.create_sheet(f"RZiS ({wariant})")
         self._create_rzis_sheet(ws_rzis, spr)
+
+        # Arkusz 3: Nota podatkowa (jeśli dostępna)
+        if spr.nota_podatkowa:
+            ws_nota = wb.create_sheet("Nota podatkowa")
+            self._create_nota_sheet(ws_nota, spr)
+
+        # Arkusz 4: Zestawienie zmian w kapitale własnym (jeśli dostępne)
+        if spr.zestawienie_zmian_kapital:
+            ws_kapital = wb.create_sheet("Zest. zmian w kapitale")
+            self._create_kapital_sheet(ws_kapital, spr)
+
+        # Arkusz 5: Rachunek przepływów pieniężnych (jeśli dostępny)
+        if spr.rachunek_przeplywow:
+            wariant_przep = "bezp." if spr.wariant_przeplywow == "bezposredni" else "pośr."
+            ws_przeplywy = wb.create_sheet(f"Rach. przepływów ({wariant_przep})")
+            self._create_przeplywy_sheet(ws_przeplywy, spr)
 
         # Zapisz
         wb.save(output_path)
@@ -160,12 +180,26 @@ class SimpleXLSXConverter:
                 "poziom": poz.poziom,
             })
 
+        # Informacje o dostępnych sekcjach
+        sekcje = {
+            "bilans": len(all_bilans) > 0,
+            "rzis": len(spr.rzis) > 0,
+            "nota_podatkowa": spr.nota_podatkowa is not None and len(spr.nota_podatkowa) > 0,
+            "zestawienie_zmian_kapital": spr.zestawienie_zmian_kapital is not None and len(spr.zestawienie_zmian_kapital) > 0,
+            "rachunek_przeplywow": spr.rachunek_przeplywow is not None and len(spr.rachunek_przeplywow) > 0,
+        }
+
         return {
             "general": general_info,
             "weryfikacja": weryfikacja,
             "bilans": bilans_preview,
             "bilans_total": len(all_bilans),
             "rzis_total": len(spr.rzis),
+            "nota_total": len(spr.nota_podatkowa) if spr.nota_podatkowa else 0,
+            "kapital_total": len(spr.zestawienie_zmian_kapital) if spr.zestawienie_zmian_kapital else 0,
+            "przeplywy_total": len(spr.rachunek_przeplywow) if spr.rachunek_przeplywow else 0,
+            "wariant_przeplywow": spr.wariant_przeplywow if spr.rachunek_przeplywow else None,
+            "sekcje": sekcje,
             "attachments_count": len(spr.zalaczniki),
         }
 
@@ -309,6 +343,115 @@ class SimpleXLSXConverter:
 
         # Szerokości kolumn
         ws.column_dimensions['A'].width = 70
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['C'].width = 18
+
+    def _create_nota_sheet(self, ws, spr: Sprawozdanie):
+        """Tworzy arkusz Nota podatkowa."""
+        meta = spr.metadane
+        firma = spr.dane_firmy
+        jednostka = meta.jednostka_walutowa
+
+        # Nagłówek
+        ws['A1'] = "NOTA PODATKOWA (Dodatkowe Informacje i Objaśnienia)"
+        ws['A1'].font = self.TITLE_FONT
+
+        ws['A2'] = "Firma:"
+        ws['B2'] = firma.nazwa
+
+        ws['A3'] = "Okres:"
+        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+
+        # Nagłówki kolumn
+        row = 5
+        ws[f'A{row}'] = "Pozycja"
+        ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
+        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+
+        for col in ['A', 'B', 'C']:
+            ws[f'{col}{row}'].font = self.HEADER_FONT
+            ws[f'{col}{row}'].fill = self.HEADER_FILL
+
+        # Pozycje
+        row += 1
+        for poz in spr.nota_podatkowa:
+            row = self._write_position_row(ws, row, poz)
+
+        # Formatowanie kolumn
+        ws.column_dimensions['A'].width = 80
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['C'].width = 18
+
+    def _create_kapital_sheet(self, ws, spr: Sprawozdanie):
+        """Tworzy arkusz Zestawienie zmian w kapitale własnym."""
+        meta = spr.metadane
+        firma = spr.dane_firmy
+        jednostka = meta.jednostka_walutowa
+
+        # Nagłówek
+        ws['A1'] = "ZESTAWIENIE ZMIAN W KAPITALE (FUNDUSZU) WŁASNYM"
+        ws['A1'].font = self.TITLE_FONT
+
+        ws['A2'] = "Firma:"
+        ws['B2'] = firma.nazwa
+
+        ws['A3'] = "Okres:"
+        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+
+        # Nagłówki kolumn
+        row = 5
+        ws[f'A{row}'] = "Pozycja"
+        ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
+        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+
+        for col in ['A', 'B', 'C']:
+            ws[f'{col}{row}'].font = self.HEADER_FONT
+            ws[f'{col}{row}'].fill = self.HEADER_FILL
+
+        # Pozycje
+        row += 1
+        for poz in spr.zestawienie_zmian_kapital:
+            row = self._write_position_row(ws, row, poz)
+
+        # Formatowanie kolumn
+        ws.column_dimensions['A'].width = 80
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['C'].width = 18
+
+    def _create_przeplywy_sheet(self, ws, spr: Sprawozdanie):
+        """Tworzy arkusz Rachunek przepływów pieniężnych."""
+        meta = spr.metadane
+        firma = spr.dane_firmy
+        jednostka = meta.jednostka_walutowa
+
+        # Nagłówek
+        wariant_nazwa = "METODA BEZPOŚREDNIA" if spr.wariant_przeplywow == "bezposredni" else "METODA POŚREDNIA"
+        ws['A1'] = f"RACHUNEK PRZEPŁYWÓW PIENIĘŻNYCH ({wariant_nazwa})"
+        ws['A1'].font = self.TITLE_FONT
+
+        ws['A2'] = "Firma:"
+        ws['B2'] = firma.nazwa
+
+        ws['A3'] = "Okres:"
+        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+
+        # Nagłówki kolumn
+        row = 5
+        ws[f'A{row}'] = "Pozycja"
+        ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
+        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+
+        for col in ['A', 'B', 'C']:
+            ws[f'{col}{row}'].font = self.HEADER_FONT
+            ws[f'{col}{row}'].fill = self.HEADER_FILL
+
+        # Pozycje
+        row += 1
+        for poz in spr.rachunek_przeplywow:
+            row = self._write_position_row(ws, row, poz)
+
+        # Formatowanie kolumn
+        ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
 

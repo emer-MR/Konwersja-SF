@@ -1,0 +1,62 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Kategorie{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Kategorie</h1>
+</div>
+
+<article>
+    <header>
+        <h3>Dodaj nowa kategorie</h3>
+    </header>
+    <form method="post" action="/admin/categories/new">
+        <div class="form-group">
+            <label for="name">Nazwa kategorii *</label>
+            <input type="text" id="name" name="name" required placeholder="np. Sprawozdania finansowe">
+        </div>
+        <div class="form-group">
+            <label for="description">Opis (opcjonalnie)</label>
+            <textarea id="description" name="description" rows="2" placeholder="Krotki opis kategorii"></textarea>
+        </div>
+        <button type="submit">Dodaj kategorie</button>
+    </form>
+</article>
+
+<article>
+    <header>
+        <h3>Istniejace kategorie</h3>
+    </header>
+
+    {% if categories %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Nazwa</th>
+                <th>Slug</th>
+                <th>Opis</th>
+                <th>Akcje</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td><strong>{{ cat.name }}</strong></td>
+                <td><small>{{ cat.slug }}</small></td>
+                <td>{{ cat.description or '-' }}</td>
+                <td class="actions">
+                    <a href="/blog?category={{ cat.slug }}" target="_blank">Podglad</a>
+                    <form action="/admin/categories/{{ cat.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunac te kategorie?');">
+                        <button type="submit" class="outline secondary" style="padding: 0.25rem 0.5rem; font-size: 0.85rem;">Usun</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>Brak kategorii.</p>
+    {% endif %}
+</article>
+{% endblock %}

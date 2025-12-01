@@ -1,0 +1,56 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Wpisy bloga{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Wpisy bloga</h1>
+    <div class="admin-actions">
+        <a href="/admin/posts/new" role="button">Nowy wpis</a>
+    </div>
+</div>
+
+{% if posts %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Tytul</th>
+            <th>Kategoria</th>
+            <th>Status</th>
+            <th>Data utworzenia</th>
+            <th>Akcje</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for post in posts %}
+        <tr>
+            <td>
+                <strong>{{ post.title }}</strong>
+                <br><small class="form-help">/blog/{{ post.slug }}</small>
+            </td>
+            <td>{{ post.category.name if post.category else '-' }}</td>
+            <td>
+                {% if post.is_published %}
+                <span class="badge badge-success">Opublikowany</span>
+                {% else %}
+                <span class="badge badge-warning">Szkic</span>
+                {% endif %}
+            </td>
+            <td>{{ post.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td class="actions">
+                {% if post.is_published %}
+                <a href="/blog/{{ post.slug }}" target="_blank">Podglad</a>
+                {% endif %}
+                <a href="/admin/posts/{{ post.id }}/edit">Edytuj</a>
+                <form action="/admin/posts/{{ post.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunac ten wpis?');">
+                    <button type="submit" class="outline secondary" style="padding: 0.25rem 0.5rem; font-size: 0.85rem;">Usun</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Brak wpisow. <a href="/admin/posts/new">Utworz pierwszy wpis</a>.</p>
+{% endif %}
+{% endblock %}

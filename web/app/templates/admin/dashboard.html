@@ -1,0 +1,45 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Dashboard</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.posts }}</div>
+        <div class="stat-label">Wpisy bloga</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.pages }}</div>
+        <div class="stat-label">Strony statyczne</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.categories }}</div>
+        <div class="stat-label">Kategorie</div>
+    </div>
+</div>
+
+<article>
+    <header>
+        <h3>Szybkie akcje</h3>
+    </header>
+    <div class="admin-actions">
+        <a href="/admin/posts/new" role="button">Nowy wpis</a>
+        <a href="/admin/pages/new" role="button" class="outline">Nowa strona</a>
+        <a href="/admin/categories" role="button" class="outline secondary">Zarzadzaj kategoriami</a>
+    </div>
+</article>
+
+<article>
+    <header>
+        <h3>Informacje</h3>
+    </header>
+    <ul>
+        <li>Zalogowany jako: <strong>{{ user.email }}</strong></li>
+        <li>Typ konta: <strong>Administrator</strong></li>
+    </ul>
+</article>
+{% endblock %}

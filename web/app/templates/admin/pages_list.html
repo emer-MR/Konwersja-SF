@@ -1,0 +1,63 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Strony statyczne{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Strony statyczne</h1>
+    <div class="admin-actions">
+        <a href="/admin/pages/new" role="button">Nowa strona</a>
+    </div>
+</div>
+
+{% if pages %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Tytul</th>
+            <th>URL</th>
+            <th>W menu</th>
+            <th>Kolejnosc</th>
+            <th>Akcje</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for page in pages %}
+        <tr>
+            <td><strong>{{ page.title }}</strong></td>
+            <td><small>/strona/{{ page.slug }}</small></td>
+            <td>
+                {% if page.is_in_menu %}
+                <span class="badge badge-success">Tak</span>
+                {% else %}
+                <span class="badge badge-warning">Nie</span>
+                {% endif %}
+            </td>
+            <td>{{ page.menu_order }}</td>
+            <td class="actions">
+                <a href="/strona/{{ page.slug }}" target="_blank">Podglad</a>
+                <a href="/admin/pages/{{ page.id }}/edit">Edytuj</a>
+                <form action="/admin/pages/{{ page.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Czy na pewno chcesz usunac te strone?');">
+                    <button type="submit" class="outline secondary" style="padding: 0.25rem 0.5rem; font-size: 0.85rem;">Usun</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Brak stron. <a href="/admin/pages/new">Utworz pierwsza strone</a>.</p>
+{% endif %}
+
+<article>
+    <header>
+        <h3>Wskazowki</h3>
+    </header>
+    <ul>
+        <li><strong>home</strong> - Strona o slug "home" wyswietla sie jako tresc strony glownej</li>
+        <li><strong>kontakt</strong> - Typowa strona kontaktowa</li>
+        <li><strong>zastrzezenie</strong> - Informacje prawne / disclaimer</li>
+    </ul>
+    <p>Strony z wlaczonym "W menu" pojawia sie w nawigacji glownej.</p>
+</article>
+{% endblock %}

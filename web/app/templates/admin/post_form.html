@@ -1,0 +1,127 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{% if post %}Edytuj wpis{% else %}Nowy wpis{% endif %}{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>{% if post %}Edytuj wpis{% else %}Nowy wpis{% endif %}</h1>
+    <div class="admin-actions">
+        <a href="/admin/posts" role="button" class="outline secondary">Anuluj</a>
+    </div>
+</div>
+
+<form method="post" action="{% if post %}/admin/posts/{{ post.id }}/edit{% else %}/admin/posts/new{% endif %}">
+    <div class="form-group">
+        <label for="title">Tytul *</label>
+        <input type="text" id="title" name="title" value="{{ post.title if post else '' }}" required>
+    </div>
+
+    <div class="form-group">
+        <label for="category_id">Kategoria</label>
+        <select id="category_id" name="category_id">
+            <option value="">-- Bez kategorii --</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if post and post.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="tags_str">Tagi (oddzielone przecinkami)</label>
+        <input type="text" id="tags_str" name="tags_str" value="{% if post %}{{ post.tags | map(attribute='name') | join(', ') }}{% endif %}" placeholder="np. finanse, sprawozdania, podatki">
+    </div>
+
+    <div class="form-group">
+        <label for="excerpt">Krotki opis (excerpt)</label>
+        <textarea id="excerpt" name="excerpt" rows="2" placeholder="Krotki opis widoczny na liscie wpisow">{{ post.excerpt if post and post.excerpt else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label>Tresc *</label>
+        <div class="editor-container">
+            <div id="editor">{% if post %}{{ post.content | safe }}{% endif %}</div>
+        </div>
+        <input type="hidden" id="content" name="content" value="">
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="is_published" value="true" {% if post and post.is_published %}checked{% endif %}>
+            Opublikowany
+        </label>
+        <p class="form-help">Jesli nie zaznaczono, wpis bedzie zapisany jako szkic.</p>
+    </div>
+
+    <div class="admin-actions">
+        <button type="submit">{% if post %}Zapisz zmiany{% else %}Utworz wpis{% endif %}</button>
+        <a href="/admin/posts" role="button" class="outline secondary">Anuluj</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inicjalizacja edytora Quill
+    var quill = new Quill('#editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                ['link', 'image'],
+                ['blockquote', 'code-block'],
+                ['clean']
+            ]
+        },
+        placeholder: 'Wpisz tresc artykulu...'
+    });
+
+    // Przed wysylka formularza skopiuj zawartosc edytora do hidden input
+    document.querySelector('form').addEventListener('submit', function(e) {
+        var content = document.getElementById('content');
+        content.value = quill.root.innerHTML;
+
+        // Walidacja - sprawdz czy jest tresc
+        if (quill.getText().trim().length < 10) {
+            e.preventDefault();
+            alert('Tresc wpisu jest zbyt krotka.');
+            return false;
+        }
+    });
+
+    // Obsluga uploadu obrazow w edytorze
+    var toolbar = quill.getModule('toolbar');
+    toolbar.addHandler('image', function() {
+        var input = document.createElement('input');
+        input.setAttribute('type', 'file');
+        input.setAttribute('accept', 'image/*');
+        input.click();
+
+        input.onchange = function() {
+            var file = input.files[0];
+            if (file) {
+                var formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/admin/upload-image', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.url) {
+                        var range = quill.getSelection();
+                        quill.insertEmbed(range.index, 'image', data.url);
+                    } else {
+                        alert('Blad uploadu obrazu');
+                    }
+                })
+                .catch(err => {
+                    alert('Blad uploadu: ' + err);
+                });
+            }
+        };
+    });
+</script>
+{% endblock %}

@@ -73,6 +73,39 @@ def validate_xml_security(content: bytes) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
+def find_sf_root_in_xades(root) -> Optional[etree._Element]:
+    """
+    Wyszukuje element sprawozdania finansowego wewnątrz podpisu XAdES.
+
+    Pliki .XAdES zawierają podpis cyfrowy (element Signature),
+    a właściwe sprawozdanie jest osadzone wewnątrz jako ds:Object lub podobny element.
+
+    Args:
+        root: Element główny dokumentu XML
+
+    Returns:
+        Element sprawozdania finansowego lub None
+    """
+    valid_root_names = [
+        "JednostkaMikro", "JednostkaMala", "JednostkaInna",
+        "JednostkaMikroWZlotych", "JednostkaMalaWZlotych", "JednostkaInnaWZlotych",
+        "JednostkaMikroWTysiacach", "JednostkaMalaWTysiacach", "JednostkaInnaWTysiacach",
+    ]
+
+    # Przeszukaj cały dokument w poszukiwaniu elementu sprawozdania
+    for elem in root.iter():
+        try:
+            elem_localname = etree.QName(elem).localname
+        except (ValueError, TypeError):
+            elem_localname = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+
+        for valid_name in valid_root_names:
+            if valid_name in elem_localname:
+                return elem
+
+    return None
+
+
 def validate_xml_structure(content: bytes) -> Tuple[bool, Optional[str], Optional[str]]:
     """
     Sprawdza czy plik XML ma strukturę sprawozdania finansowego.
@@ -80,6 +113,7 @@ def validate_xml_structure(content: bytes) -> Tuple[bool, Optional[str], Optiona
     Weryfikuje:
     - Poprawność składni XML
     - Obecność elementu głównego JednostkaMikro/JednostkaMala/JednostkaInna
+    - Obsługuje pliki XAdES (podpisane cyfrowo) - szuka SF wewnątrz podpisu
     - Odpowiednie namespace'y MF
 
     Args:
@@ -105,7 +139,7 @@ def validate_xml_structure(content: bytes) -> Tuple[bool, Optional[str], Optiona
     try:
         localname = etree.QName(root).localname
     except (ValueError, TypeError):
-        localname = root.tag
+        localname = root.tag.split('}')[-1] if '}' in root.tag else root.tag
 
     # Sprawdź czy to sprawozdanie finansowe
     valid_root_names = [
@@ -122,6 +156,7 @@ def validate_xml_structure(content: bytes) -> Tuple[bool, Optional[str], Optiona
 
     entity_type = None
     is_valid_root = False
+    sf_root = root  # Element do dalszej walidacji
 
     for valid_name in valid_root_names:
         if valid_name in localname:
@@ -135,31 +170,58 @@ def validate_xml_structure(content: bytes) -> Tuple[bool, Optional[str], Optiona
                 entity_type = "Inna"
             break
 
+    # Jeśli główny element to Signature (XAdES), szukaj SF wewnątrz
+    if not is_valid_root and localname in ["Signature", "XAdES", "XAdESSignatures"]:
+        sf_element = find_sf_root_in_xades(root)
+        if sf_element is not None:
+            sf_root = sf_element
+            try:
+                sf_localname = etree.QName(sf_element).localname
+            except (ValueError, TypeError):
+                sf_localname = sf_element.tag.split('}')[-1] if '}' in sf_element.tag else sf_element.tag
+
+            for valid_name in valid_root_names:
+                if valid_name in sf_localname:
+                    is_valid_root = True
+                    if "Mikro" in valid_name:
+                        entity_type = "Mikro"
+                    elif "Mala" in valid_name:
+                        entity_type = "Mala"
+                    else:
+                        entity_type = "Inna"
+                    break
+
     if not is_valid_root:
         return False, f"Nieobsługiwany typ dokumentu: '{localname}'. Obsługiwane są tylko sprawozdania finansowe (JednostkaMikro, JednostkaMala, JednostkaInna).", None
 
-    # Sprawdź namespace
-    namespace = etree.QName(root).namespace or ""
+    # Sprawdź namespace sprawozdania (sf_root, nie root - bo root może być Signature)
+    try:
+        namespace = etree.QName(sf_root).namespace or ""
+    except (ValueError, TypeError):
+        namespace = ""
+
     valid_ns_patterns = [
         "mf.gov.pl/schematy/SF",
         "sprawozdaniafinansowe",
+        "xmldsig",  # XAdES może mieć taki namespace
     ]
 
     has_valid_ns = any(pattern.lower() in namespace.lower() for pattern in valid_ns_patterns)
 
-    # Pozwól również bez namespace dla starszych plików
-    if not has_valid_ns and namespace:
+    # Pozwól również bez namespace dla starszych plików lub XAdES
+    # Dla XAdES nie sprawdzamy namespace tak restrykcyjnie
+    if not has_valid_ns and namespace and sf_root == root:
         return False, f"Nierozpoznany namespace dokumentu: '{namespace}'", None
 
-    # Sprawdź czy są wymagane sekcje
+    # Sprawdź czy są wymagane sekcje (w sf_root, nie root)
     has_naglowek = False
     has_bilans = False
 
-    for elem in root.iter():
+    for elem in sf_root.iter():
         try:
             elem_localname = etree.QName(elem).localname
         except (ValueError, TypeError):
-            continue
+            elem_localname = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
 
         if elem_localname == "Naglowek":
             has_naglowek = True

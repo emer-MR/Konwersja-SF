@@ -1,0 +1,138 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{% if page %}Edytuj strone{% else %}Nowa strona{% endif %}{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>{% if page %}Edytuj strone{% else %}Nowa strona{% endif %}</h1>
+    <div class="admin-actions">
+        <a href="/admin/pages" role="button" class="outline secondary">Anuluj</a>
+    </div>
+</div>
+
+<form method="post" action="{% if page %}/admin/pages/{{ page.id }}/edit{% else %}/admin/pages/new{% endif %}">
+    <div class="form-group">
+        <label for="title">Tytul strony *</label>
+        <input type="text" id="title" name="title" value="{{ page.title if page else '' }}" required>
+    </div>
+
+    <div class="form-group">
+        <label for="slug">Adres URL (slug) *</label>
+        <input type="text" id="slug" name="slug" value="{{ page.slug if page else '' }}" required placeholder="np. kontakt, o-nas, zastrzezenie">
+        <p class="form-help">Strona bedzie dostepna pod adresem: /strona/[slug]</p>
+    </div>
+
+    <div class="form-group">
+        <label>Tresc *</label>
+        <div class="editor-container">
+            <div id="editor">{% if page %}{{ page.content | safe }}{% endif %}</div>
+        </div>
+        <input type="hidden" id="content" name="content" value="">
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="is_in_menu" value="true" {% if page and page.is_in_menu %}checked{% endif %}>
+            Pokazuj w menu glownym
+        </label>
+    </div>
+
+    <div class="form-group">
+        <label for="menu_order">Kolejnosc w menu</label>
+        <input type="number" id="menu_order" name="menu_order" value="{{ page.menu_order if page else 0 }}" min="0" max="100">
+        <p class="form-help">Mniejsza liczba = wyzej w menu. Domyslnie: 0</p>
+    </div>
+
+    <div class="admin-actions">
+        <button type="submit">{% if page %}Zapisz zmiany{% else %}Utworz strone{% endif %}</button>
+        <a href="/admin/pages" role="button" class="outline secondary">Anuluj</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inicjalizacja edytora Quill
+    var quill = new Quill('#editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                ['link', 'image'],
+                ['blockquote', 'code-block'],
+                ['clean']
+            ]
+        },
+        placeholder: 'Wpisz tresc strony...'
+    });
+
+    // Automatyczne generowanie sluga z tytulu (tylko dla nowych stron)
+    {% if not page %}
+    document.getElementById('title').addEventListener('blur', function() {
+        var slugField = document.getElementById('slug');
+        if (!slugField.value) {
+            var title = this.value;
+            // Prosta konwersja na slug
+            var slug = title.toLowerCase()
+                .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e')
+                .replace(/ł/g, 'l').replace(/ń/g, 'n').replace(/ó/g, 'o')
+                .replace(/ś/g, 's').replace(/ź/g, 'z').replace(/ż/g, 'z')
+                .replace(/[^\w\s-]/g, '')
+                .replace(/[\s_]+/g, '-')
+                .replace(/-+/g, '-')
+                .trim();
+            slugField.value = slug;
+        }
+    });
+    {% endif %}
+
+    // Przed wysylka formularza skopiuj zawartosc edytora do hidden input
+    document.querySelector('form').addEventListener('submit', function(e) {
+        var content = document.getElementById('content');
+        content.value = quill.root.innerHTML;
+
+        // Walidacja - sprawdz czy jest tresc
+        if (quill.getText().trim().length < 5) {
+            e.preventDefault();
+            alert('Tresc strony jest zbyt krotka.');
+            return false;
+        }
+    });
+
+    // Obsluga uploadu obrazow w edytorze
+    var toolbar = quill.getModule('toolbar');
+    toolbar.addHandler('image', function() {
+        var input = document.createElement('input');
+        input.setAttribute('type', 'file');
+        input.setAttribute('accept', 'image/*');
+        input.click();
+
+        input.onchange = function() {
+            var file = input.files[0];
+            if (file) {
+                var formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/admin/upload-image', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.url) {
+                        var range = quill.getSelection();
+                        quill.insertEmbed(range.index, 'image', data.url);
+                    } else {
+                        alert('Blad uploadu obrazu');
+                    }
+                })
+                .catch(err => {
+                    alert('Blad uploadu: ' + err);
+                });
+            }
+        };
+    });
+</script>
+{% endblock %}

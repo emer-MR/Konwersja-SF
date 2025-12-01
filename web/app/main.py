@@ -23,9 +23,10 @@ from app.auth import (
     authenticate_user,
     create_access_token,
 )
-from app.models import User
+from app.models import User, StaticPage
 from app.api.auth_routes import router as auth_router
 from app.api.convert_routes import router as convert_router
+from app.api.blog_routes import router as blog_router
 from app.xml_validator import validate_xml
 
 
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
     """Inicjalizacja przy starcie aplikacji."""
     # Utwórz katalogi
     Path("./data").mkdir(exist_ok=True)
+    Path("./data/uploads/images").mkdir(parents=True, exist_ok=True)
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     settings.ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,9 +87,28 @@ static_path = Path(__file__).parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-# Routery API (tylko auth, convert obsługujemy przez HTMX poniżej)
+# Katalog na uploady (obrazy do bloga)
+uploads_path = Path("./data/uploads")
+if uploads_path.exists():
+    app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
+
+# Routery API
 app.include_router(auth_router)
+app.include_router(blog_router)  # Blog i panel admina
 # app.include_router(convert_router)  # wyłączone - używamy HTMX endpointów
+
+
+# ============== POMOCNICZE FUNKCJE ==============
+
+async def get_menu_pages(db: AsyncSession):
+    """Pobiera strony statyczne do menu."""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(StaticPage)
+        .where(StaticPage.is_in_menu == True)
+        .order_by(StaticPage.menu_order)
+    )
+    return result.scalars().all()
 
 
 # ============== STRONY HTML ==============
@@ -96,14 +117,27 @@ app.include_router(auth_router)
 async def home(
     request: Request,
     user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
 ):
     """Strona główna."""
-    if user:
-        return RedirectResponse(url="/convert", status_code=status.HTTP_302_FOUND)
+    from sqlalchemy import select
+
+    # Pobierz stronę "home" z bazy
+    result = await db.execute(
+        select(StaticPage).where(StaticPage.slug == "home")
+    )
+    home_page = result.scalar_one_or_none()
+
+    menu_pages = await get_menu_pages(db)
 
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "user": user},
+        {
+            "request": request,
+            "user": user,
+            "home_page": home_page,
+            "menu_pages": menu_pages,
+        },
     )
 
 
