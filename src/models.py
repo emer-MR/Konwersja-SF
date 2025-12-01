@@ -84,6 +84,7 @@ class PozycjaFinansowa:
     opis: str                       # np. "A.II.1. Środki trwałe"
     kwota_biezaca: Optional[Decimal] = None
     kwota_poprzednia: Optional[Decimal] = None
+    kwota_przeksztalcona: Optional[Decimal] = None  # Przekształcone dane porównawcze (KwotaB1)
     poziom: int = 0                 # głębokość wcięcia dla hierarchii (0, 1, 2...)
 
     def kod_pelny(self, typ_jednostki: str, wersja: str) -> str:

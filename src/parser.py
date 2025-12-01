@@ -500,14 +500,24 @@ class SFParser:
         return pozycje
 
     def _parse_nota_podatkowa(self, typ_jednostki: str) -> Optional[list]:
-        """Parsuje notę podatkową (Dodatkowe Informacje i Objaśnienia)."""
+        """Parsuje notę podatkową (Dodatkowe Informacje i Objaśnienia).
+
+        Generuje osobne wiersze dla każdej podpozycji (KwotaA, KwotaB, KwotaC).
+        Struktura zgodna z wzorcowym arkuszem noty podatkowej.
+        """
+        from mappings import NOTA_PODATKOWA_SUBKWOTY
+
         pozycje = []
 
-        # Szukaj sekcji z notą podatkową
+        # Szukaj sekcji z notą podatkową - może być w różnych miejscach
         nota_elem = None
         for elem in self.root.iter():
             localname = self._safe_localname(elem)
-            if localname and ("DodatkoweInformacje" in localname or "InformacjeDodatkowe" in localname):
+            if localname and (
+                "InformacjaDodatkowaDotyczacaPodatkuDochodowego" in localname or
+                "DodatkoweInformacje" in localname or
+                "InformacjeDodatkowe" in localname
+            ):
                 nota_elem = elem
                 break
 
@@ -520,28 +530,81 @@ class SFParser:
             if not localname:
                 continue
             if localname.startswith("P_ID_"):
-                kwota_a = None
-                kwota_b = None
+                base_opis = get_opis(localname, typ_jednostki, "Nota")
 
-                for child in elem.iter():
+                # Sprawdź strukturę elementu - może być:
+                # 1. Prosty format: <P_ID_X><RB>wartość</RB><RP>wartość</RP></P_ID_X>
+                # 2. Złożony format: <P_ID_X><Kwota><RB><KwotaA/B/C>...</RB><RP>...</RP></Kwota></P_ID_X>
+
+                is_simple_format = False
+                kwota_elem = None
+
+                for child in elem:
                     child_name = self._safe_localname(child)
-                    if not child_name:
-                        continue
-                    if child_name == "KwotaA" and child.text:
-                        kwota_a = self._parse_decimal(child.text)
-                    elif child_name == "KwotaB" and child.text:
-                        kwota_b = self._parse_decimal(child.text)
+                    if child_name == "Kwota":
+                        kwota_elem = child
+                        break
+                    elif child_name in ("RB", "RP"):
+                        is_simple_format = True
 
-                if kwota_a is not None or kwota_b is not None:
-                    opis = get_opis(localname, typ_jednostki, "Nota")
-                    pozycje.append(PozycjaFinansowa(
-                        sekcja="Nota",
-                        kod=localname,
-                        opis=opis,
-                        kwota_biezaca=kwota_a,
-                        kwota_poprzednia=kwota_b,
-                        poziom=0,
-                    ))
+                if is_simple_format:
+                    # Prosty format - jedna pozycja z RB/RP
+                    kwota_biezaca = None
+                    kwota_poprzednia = None
+
+                    for child in elem:
+                        child_name = self._safe_localname(child)
+                        if child_name == "RB" and child.text:
+                            kwota_biezaca = self._parse_decimal(child.text)
+                        elif child_name == "RP" and child.text:
+                            kwota_poprzednia = self._parse_decimal(child.text)
+
+                    if kwota_biezaca is not None or kwota_poprzednia is not None:
+                        # Dla prostego formatu dodaj suffiks [wartość łączna]
+                        opis = f"{base_opis} {NOTA_PODATKOWA_SUBKWOTY.get('KwotaA', '')}"
+                        pozycje.append(PozycjaFinansowa(
+                            sekcja="Nota",
+                            kod=f"{localname}_KwotaA",
+                            opis=opis,
+                            kwota_biezaca=kwota_biezaca,
+                            kwota_poprzednia=kwota_poprzednia,
+                            poziom=0,
+                        ))
+
+                elif kwota_elem is not None:
+                    # Złożony format - wyciągnij KwotaA, KwotaB, KwotaC jako osobne wiersze
+                    rb_values = {}  # KwotaA/B/C -> wartość
+                    rp_values = {}  # KwotaA/B/C -> wartość
+
+                    for kwota_child in kwota_elem:
+                        kwota_child_name = self._safe_localname(kwota_child)
+                        if kwota_child_name == "RB":
+                            for rb_child in kwota_child:
+                                rb_child_name = self._safe_localname(rb_child)
+                                if rb_child_name in ("KwotaA", "KwotaB", "KwotaC") and rb_child.text:
+                                    rb_values[rb_child_name] = self._parse_decimal(rb_child.text)
+                        elif kwota_child_name == "RP":
+                            for rp_child in kwota_child:
+                                rp_child_name = self._safe_localname(rp_child)
+                                if rp_child_name in ("KwotaA", "KwotaB", "KwotaC") and rp_child.text:
+                                    rp_values[rp_child_name] = self._parse_decimal(rp_child.text)
+
+                    # Generuj osobne wiersze dla każdej podpozycji
+                    for sub_kwota in ("KwotaA", "KwotaB", "KwotaC"):
+                        kwota_biezaca = rb_values.get(sub_kwota)
+                        kwota_poprzednia = rp_values.get(sub_kwota)
+
+                        if kwota_biezaca is not None or kwota_poprzednia is not None:
+                            suffiks = NOTA_PODATKOWA_SUBKWOTY.get(sub_kwota, "")
+                            opis = f"{base_opis} {suffiks}"
+                            pozycje.append(PozycjaFinansowa(
+                                sekcja="Nota",
+                                kod=f"{localname}_{sub_kwota}",
+                                opis=opis,
+                                kwota_biezaca=kwota_biezaca,
+                                kwota_poprzednia=kwota_poprzednia,
+                                poziom=0 if sub_kwota == "KwotaA" else 1,  # podpozycje z wcięciem
+                            ))
 
         return pozycje if pozycje else None
 
@@ -659,6 +722,7 @@ class SFParser:
         # Wyciągnij kwoty z bieżącego elementu
         kwota_a = None
         kwota_b = None
+        kwota_b1 = None  # Przekształcone dane porównawcze
 
         for child in element:
             child_name = self._safe_localname(child)
@@ -668,6 +732,8 @@ class SFParser:
                 kwota_a = self._parse_decimal(child.text)
             elif child_name == "KwotaB" and child.text:
                 kwota_b = self._parse_decimal(child.text)
+            elif child_name == "KwotaB1" and child.text:
+                kwota_b1 = self._parse_decimal(child.text)
 
         # Określ kod pozycji
         if prefix and not localname.startswith(prefix):
@@ -676,7 +742,7 @@ class SFParser:
             kod = localname
 
         # Dodaj pozycję jeśli ma kwoty
-        if kwota_a is not None or kwota_b is not None:
+        if kwota_a is not None or kwota_b is not None or kwota_b1 is not None:
             opis = get_opis(kod, typ_jednostki, sekcja, wariant_rzis)
             poziom = calculate_poziom(kod)
 
@@ -686,6 +752,7 @@ class SFParser:
                 opis=opis,
                 kwota_biezaca=kwota_a,
                 kwota_poprzednia=kwota_b,
+                kwota_przeksztalcona=kwota_b1,
                 poziom=poziom,
             ))
 
@@ -698,7 +765,7 @@ class SFParser:
                 continue
 
             # Pomijaj elementy kwot i metadane
-            if child_name in ("KwotaA", "KwotaB", "KodSprawozdania", "WariantSprawozdania"):
+            if child_name in ("KwotaA", "KwotaB", "KwotaB1", "KodSprawozdania", "WariantSprawozdania"):
                 continue
 
             # Pomijaj podpisy i załączniki

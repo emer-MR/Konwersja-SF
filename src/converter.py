@@ -165,8 +165,9 @@ class XLSXConverter:
         jednostka_skrot = "tys." if meta.jednostka_walutowa == "tys. PLN" else ""
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} [{meta.jednostka_walutowa}]"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} [{meta.jednostka_walutowa}]"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone [{meta.jednostka_walutowa}]"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
@@ -177,7 +178,7 @@ class XLSXConverter:
         row += 1
 
         for poz in self.spr.bilans_aktywa:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # PASYWA
         row += 2
@@ -186,12 +187,13 @@ class XLSXConverter:
         row += 1
 
         for poz in self.spr.bilans_pasywa:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 60
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_rzis_sheet(self, ws):
         """Tworzy arkusz RZiS w formacie czytelnym."""
@@ -220,23 +222,30 @@ class XLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} [{meta.jednostka_walutowa}]"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} [{meta.jednostka_walutowa}]"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone [{meta.jednostka_walutowa}]"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
         # Pozycje RZiS
         row += 1
         for poz in self.spr.rzis:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 70
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_nota_sheet(self, ws):
-        """Tworzy arkusz Nota podatkowa."""
+        """Tworzy arkusz Nota podatkowa.
+
+        UWAGA: Schemat noty podatkowej (XML) nie zawiera trzeciej kolumny
+        (przekształcone dane porównawcze). Kolumna D jest dodawana dla
+        spójności formatu, ale pozostaje pusta.
+        """
         meta = self.spr.metadane
         firma = self.spr.dane_firmy
 
@@ -252,20 +261,22 @@ class XLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
-        # Pozycje
+        # Pozycje (nota podatkowa nie ma danych przekształconych w schemacie XML)
         row += 1
         for poz in self.spr.nota_podatkowa:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=False)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_kapital_sheet(self, ws):
         """Tworzy arkusz Zestawienie zmian w kapitale własnym."""
@@ -287,20 +298,22 @@ class XLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
         # Pozycje
         row += 1
         for poz in self.spr.zestawienie_zmian_kapital:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_przeplywy_sheet(self, ws):
         """Tworzy arkusz Rachunek przepływów pieniężnych."""
@@ -323,20 +336,22 @@ class XLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
         # Pozycje
         row += 1
         for poz in self.spr.rachunek_przeplywow:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_indicators_sheet(self, ws):
         """Tworzy arkusz z analizą wskaźnikową niewypłacalności.
@@ -612,7 +627,7 @@ class XLSXConverter:
     def _create_raw_data_sheet(self, ws):
         """Tworzy arkusz z danymi surowymi (wszystkie pozycje z kodami)."""
         # Nagłówki
-        headers = ["sekcja", "kod", "opis", "rok_biezacy", "rok_poprzedni"]
+        headers = ["sekcja", "kod", "opis", "rok_biezacy", "rok_poprzedni", "rok_poprzedni_przeksztalcone"]
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = self.HEADER_FONT
@@ -635,6 +650,10 @@ class XLSXConverter:
                 cell = ws.cell(row=row, column=5, value=float(poz.kwota_poprzednia))
                 cell.number_format = self.MONEY_FORMAT
 
+            if poz.kwota_przeksztalcona is not None:
+                cell = ws.cell(row=row, column=6, value=float(poz.kwota_przeksztalcona))
+                cell.number_format = self.MONEY_FORMAT
+
             row += 1
 
         # Formatowanie kolumn
@@ -643,9 +662,10 @@ class XLSXConverter:
         ws.column_dimensions['C'].width = 60
         ws.column_dimensions['D'].width = 15
         ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 22
 
         # Włącz autofiltr
-        ws.auto_filter.ref = f"A1:E{row-1}"
+        ws.auto_filter.ref = f"A1:F{row-1}"
 
     def _create_analytical_sheet(self, ws):
         """Tworzy arkusz z danymi analitycznymi (format długi)."""
@@ -655,7 +675,7 @@ class XLSXConverter:
         # Nagłówki
         headers = [
             "firma", "nip", "krs", "typ_jednostki", "wersja",
-            "okres", "sekcja", "kod", "kod_pelny", "opis", "kwota"
+            "okres", "typ_okresu", "sekcja", "kod", "kod_pelny", "opis", "kwota"
         ]
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
@@ -676,11 +696,12 @@ class XLSXConverter:
                 ws.cell(row=row, column=4, value=meta.typ_jednostki)
                 ws.cell(row=row, column=5, value=meta.wersja_schematu)
                 ws.cell(row=row, column=6, value=meta.okres_do)
-                ws.cell(row=row, column=7, value=poz.sekcja)
-                ws.cell(row=row, column=8, value=poz.kod)
-                ws.cell(row=row, column=9, value=kod_pelny)
-                ws.cell(row=row, column=10, value=poz.opis)
-                cell = ws.cell(row=row, column=11, value=float(poz.kwota_biezaca))
+                ws.cell(row=row, column=7, value="biezacy")
+                ws.cell(row=row, column=8, value=poz.sekcja)
+                ws.cell(row=row, column=9, value=poz.kod)
+                ws.cell(row=row, column=10, value=kod_pelny)
+                ws.cell(row=row, column=11, value=poz.opis)
+                cell = ws.cell(row=row, column=12, value=float(poz.kwota_biezaca))
                 cell.number_format = self.MONEY_FORMAT
                 row += 1
 
@@ -693,11 +714,30 @@ class XLSXConverter:
                 ws.cell(row=row, column=4, value=meta.typ_jednostki)
                 ws.cell(row=row, column=5, value=meta.wersja_schematu)
                 ws.cell(row=row, column=6, value=okres_poprz)
-                ws.cell(row=row, column=7, value=poz.sekcja)
-                ws.cell(row=row, column=8, value=poz.kod)
-                ws.cell(row=row, column=9, value=kod_pelny)
-                ws.cell(row=row, column=10, value=poz.opis)
-                cell = ws.cell(row=row, column=11, value=float(poz.kwota_poprzednia))
+                ws.cell(row=row, column=7, value="poprzedni")
+                ws.cell(row=row, column=8, value=poz.sekcja)
+                ws.cell(row=row, column=9, value=poz.kod)
+                ws.cell(row=row, column=10, value=kod_pelny)
+                ws.cell(row=row, column=11, value=poz.opis)
+                cell = ws.cell(row=row, column=12, value=float(poz.kwota_poprzednia))
+                cell.number_format = self.MONEY_FORMAT
+                row += 1
+
+            # Rok poprzedni przekształcony
+            if poz.kwota_przeksztalcona is not None:
+                okres_poprz = date(meta.okres_do.year - 1, 12, 31)
+                ws.cell(row=row, column=1, value=firma.nazwa)
+                ws.cell(row=row, column=2, value=firma.nip)
+                ws.cell(row=row, column=3, value=firma.krs or "")
+                ws.cell(row=row, column=4, value=meta.typ_jednostki)
+                ws.cell(row=row, column=5, value=meta.wersja_schematu)
+                ws.cell(row=row, column=6, value=okres_poprz)
+                ws.cell(row=row, column=7, value="przeksztalcony")
+                ws.cell(row=row, column=8, value=poz.sekcja)
+                ws.cell(row=row, column=9, value=poz.kod)
+                ws.cell(row=row, column=10, value=kod_pelny)
+                ws.cell(row=row, column=11, value=poz.opis)
+                cell = ws.cell(row=row, column=12, value=float(poz.kwota_przeksztalcona))
                 cell.number_format = self.MONEY_FORMAT
                 row += 1
 
@@ -708,14 +748,15 @@ class XLSXConverter:
         ws.column_dimensions['D'].width = 12
         ws.column_dimensions['E'].width = 8
         ws.column_dimensions['F'].width = 12
-        ws.column_dimensions['G'].width = 10
-        ws.column_dimensions['H'].width = 25
-        ws.column_dimensions['I'].width = 35
-        ws.column_dimensions['J'].width = 50
-        ws.column_dimensions['K'].width = 15
+        ws.column_dimensions['G'].width = 14
+        ws.column_dimensions['H'].width = 10
+        ws.column_dimensions['I'].width = 25
+        ws.column_dimensions['J'].width = 35
+        ws.column_dimensions['K'].width = 50
+        ws.column_dimensions['L'].width = 15
 
         # Włącz autofiltr
-        ws.auto_filter.ref = f"A1:K{row-1}"
+        ws.auto_filter.ref = f"A1:L{row-1}"
 
     def _save_attachments(self, output_dir: Path) -> list:
         """Zapisuje załączniki binarne do katalogu wyjściowego.
@@ -762,13 +803,14 @@ class XLSXConverter:
 
         return saved_paths
 
-    def _write_position_row(self, ws, row: int, poz: PozycjaFinansowa) -> int:
+    def _write_position_row(self, ws, row: int, poz: PozycjaFinansowa, has_przeksztalcona: bool = True) -> int:
         """Zapisuje wiersz pozycji finansowej.
 
         Args:
             ws: Arkusz
             row: Numer wiersza
             poz: Pozycja finansowa
+            has_przeksztalcona: Czy arkusz ma kolumnę z danymi przekształconymi
 
         Returns:
             Numer następnego wiersza
@@ -791,6 +833,13 @@ class XLSXConverter:
         if poz.kwota_poprzednia is not None:
             cell = ws[f'C{row}']
             cell.value = float(poz.kwota_poprzednia)
+            cell.number_format = self.MONEY_FORMAT
+            cell.alignment = Alignment(horizontal='right')
+
+        # Kwota przekształcona (trzecia kolumna - przekształcone dane porównawcze)
+        if has_przeksztalcona and poz.kwota_przeksztalcona is not None:
+            cell = ws[f'D{row}']
+            cell.value = float(poz.kwota_przeksztalcona)
             cell.number_format = self.MONEY_FORMAT
             cell.alignment = Alignment(horizontal='right')
 

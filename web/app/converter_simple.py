@@ -283,8 +283,9 @@ class SimpleXLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone ({jednostka})"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
@@ -295,7 +296,7 @@ class SimpleXLSXConverter:
         row += 1
 
         for poz in spr.bilans_aktywa:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # PASYWA
         row += 2
@@ -304,12 +305,13 @@ class SimpleXLSXConverter:
         row += 1
 
         for poz in spr.bilans_pasywa:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Szerokości kolumn
         ws.column_dimensions['A'].width = 60
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_rzis_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz RZiS."""
@@ -337,23 +339,30 @@ class SimpleXLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone ({jednostka})"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
         # Pozycje RZiS
         row += 1
         for poz in spr.rzis:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Szerokości kolumn
         ws.column_dimensions['A'].width = 70
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_nota_sheet(self, ws, spr: Sprawozdanie):
-        """Tworzy arkusz Nota podatkowa."""
+        """Tworzy arkusz Nota podatkowa.
+
+        UWAGA: Schemat noty podatkowej (XML) nie zawiera trzeciej kolumny
+        (przekształcone dane porównawcze). Kolumna D jest dodawana dla
+        spójności formatu, ale pozostaje pusta.
+        """
         meta = spr.metadane
         firma = spr.dane_firmy
         jednostka = meta.jednostka_walutowa
@@ -373,20 +382,22 @@ class SimpleXLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone ({jednostka})"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
-        # Pozycje
+        # Pozycje (nota podatkowa nie ma danych przekształconych w schemacie XML)
         row += 1
         for poz in spr.nota_podatkowa:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=False)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_kapital_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz Zestawienie zmian w kapitale własnym."""
@@ -409,20 +420,22 @@ class SimpleXLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone ({jednostka})"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
         # Pozycje
         row += 1
         for poz in spr.zestawienie_zmian_kapital:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
     def _create_przeplywy_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz Rachunek przepływów pieniężnych."""
@@ -446,23 +459,35 @@ class SimpleXLSXConverter:
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
+        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone ({jednostka})"
 
-        for col in ['A', 'B', 'C']:
+        for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
             ws[f'{col}{row}'].fill = self.HEADER_FILL
 
         # Pozycje
         row += 1
         for poz in spr.rachunek_przeplywow:
-            row = self._write_position_row(ws, row, poz)
+            row = self._write_position_row(ws, row, poz, has_przeksztalcona=True)
 
         # Formatowanie kolumn
         ws.column_dimensions['A'].width = 80
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 22
 
-    def _write_position_row(self, ws, row: int, poz: PozycjaFinansowa) -> int:
-        """Zapisuje wiersz pozycji finansowej."""
+    def _write_position_row(self, ws, row: int, poz: PozycjaFinansowa, has_przeksztalcona: bool = True) -> int:
+        """Zapisuje wiersz pozycji finansowej.
+
+        Args:
+            ws: Arkusz
+            row: Numer wiersza
+            poz: Pozycja finansowa
+            has_przeksztalcona: Czy arkusz ma kolumnę z danymi przekształconymi
+
+        Returns:
+            Numer następnego wiersza
+        """
         # Wcięcie
         indent = "  " * poz.poziom
         ws[f'A{row}'] = f"{indent}{poz.opis}"
@@ -481,6 +506,13 @@ class SimpleXLSXConverter:
         if poz.kwota_poprzednia is not None:
             cell = ws[f'C{row}']
             cell.value = float(poz.kwota_poprzednia)
+            cell.number_format = self.money_format
+            cell.alignment = Alignment(horizontal='right')
+
+        # Kwota przekształcona (trzecia kolumna)
+        if has_przeksztalcona and poz.kwota_przeksztalcona is not None:
+            cell = ws[f'D{row}']
+            cell.value = float(poz.kwota_przeksztalcona)
             cell.number_format = self.money_format
             cell.alignment = Alignment(horizontal='right')
 

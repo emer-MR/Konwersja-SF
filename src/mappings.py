@@ -623,13 +623,30 @@ RZIS_MIKRO = {
 
 # =============================================================================
 # NOTA PODATKOWA
+# Rozliczenie różnicy pomiędzy podstawą opodatkowania podatkiem dochodowym
+# a wynikiem finansowym (zyskiem, stratą) brutto
 # =============================================================================
 
+# Główne pozycje noty podatkowej
 NOTA_PODATKOWA = {
-    "P_ID_1": "Różnica między podstawą opodatkowania podatkiem dochodowym a wynikiem finansowym (zyskiem, stratą) brutto",
-    "P_ID_2": "Inne zmiany podstawy opodatkowania",
-    "P_ID_3": "Podstawa opodatkowania podatkiem dochodowym",
-    "P_ID_4": "Podatek dochodowy",
+    "P_ID_1": "A. Zysk (strata) brutto za dany rok",
+    "P_ID_2": "B. Przychody zwolnione z opodatkowania (trwałe różnice pomiędzy zyskiem/stratą dla celów rachunkowych a dochodem/stratą dla celów podatkowych)",
+    "P_ID_3": "C. Przychody niepodlegające opodatkowaniu w roku bieżącym",
+    "P_ID_4": "D. Przychody podlegające opodatkowaniu w roku bieżącym, ujęte w księgach rachunkowych lat ubiegłych",
+    "P_ID_5": "E. Koszty niestanowiące kosztów uzyskania przychodów (trwałe różnice pomiędzy zyskiem/stratą dla celów rachunkowych a dochodem/stratą dla celów podatkowych)",
+    "P_ID_6": "F. Koszty nieuznawane za koszty uzyskania przychodów w bieżącym roku",
+    "P_ID_7": "G. Koszty uznawane za koszty uzyskania przychodów w roku bieżącym ujęte w księgach lat ubiegłych",
+    "P_ID_8": "H. Strata z lat ubiegłych",
+    "P_ID_9": "I. Inne zmiany podstawy opodatkowania",
+    "P_ID_10": "J. Podstawa opodatkowania podatkiem dochodowym",
+    "P_ID_11": "K. Podatek dochodowy",
+}
+
+# Suffiksy dla podpozycji (KwotaA, KwotaB, KwotaC)
+NOTA_PODATKOWA_SUBKWOTY = {
+    "KwotaA": "[wartość łączna]",
+    "KwotaB": "[z zysków kapitałowych]",
+    "KwotaC": "[z innych źródeł przychodów]",
 }
 
 # =============================================================================

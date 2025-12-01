@@ -18,8 +18,43 @@ services:
     container_name: konwerter-sf
     restart: unless-stopped
 
-    ports:
-      - "8080:8000"
+    # Traefik Labels
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.konwerter.rule=Host(`konwersja.analizy.io`)
+# Docker Compose dla Hostinger VPS
+# Może być użyty przez Docker Manager (GUI) lub SSH
+#
+# Użycie przez Docker Manager:
+#   1. Wklej URL: https://raw.githubusercontent.com/emer-MR/Konwersja-SF/main/web/docker-compose.hostinger.yml
+#   2. Uzupełnij zmienne środowiskowe w formularzu
+#
+# Użycie przez SSH:
+#   docker compose -f docker-compose.hostinger.yml up -d
+
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile.prod
+    container_name: konwerter-sf
+    restart: unless-stopped
+
+    # Traefik Labels - KLUCZOWE DLA DZIAŁANIA DOMENY
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.konwerter.rule=Host(`konwersja.analizy.io`)
+      - traefik.http.routers.konwerter.tls=true
+      - traefik.http.routers.konwerter.entrypoints=web,websecure
+      - traefik.http.routers.konwerter.tls.certresolver=mytlschallenge
+      - traefik.http.services.konwerter.loadbalancer.server.port=8000
+      - traefik.docker.network=root_default
+
+    networks:
+      - default
+      - traefik_network
 
     environment:
       # Wymagane - uzupełnij w Docker Manager lub pliku .env
@@ -59,3 +94,8 @@ services:
 volumes:
   konwerter_data:
     driver: local
+
+networks:
+  traefik_network:
+    external: true
+    name: root_default
