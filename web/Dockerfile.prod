@@ -1,0 +1,60 @@
+# Dockerfile produkcyjny dla Konwertera SF
+# Zbudowany z kontekstem na poziomie głównego katalogu projektu
+#
+# Build: docker build -f web/Dockerfile.prod -t konwerter-sf ..
+# Run:   docker run -p 8080:8000 konwerter-sf
+
+FROM python:3.11-slim
+
+LABEL maintainer="Konwerter SF"
+LABEL description="Konwerter Sprawozdań Finansowych XML → XLSX"
+LABEL version="1.0"
+
+# Zmienne środowiskowe
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV APP_HOME=/app
+
+WORKDIR $APP_HOME
+
+# Zależności systemowe dla lxml
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libxml2-dev \
+    libxslt1-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Zależności Python
+COPY web/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Kod źródłowy - główny moduł parsera (src/)
+COPY src ./src
+
+# Kod aplikacji webowej (web/app/)
+COPY web/app ./app
+
+# Skrypt tworzenia admina
+COPY web/create_admin.py .
+
+# Katalogi na dane persistentne
+RUN mkdir -p /app/data/uploads /app/data/outputs /app/data/attachments
+
+# Uprawnienia
+RUN chmod -R 755 /app
+
+# Użytkownik nie-root (bezpieczeństwo)
+RUN useradd -m -u 1000 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+# Port aplikacji
+EXPOSE 8000
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')" || exit 1
+
+# Uruchomienie serwera produkcyjnego
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
