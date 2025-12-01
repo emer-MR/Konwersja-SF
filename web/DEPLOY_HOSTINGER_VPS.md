@@ -1,12 +1,15 @@
 # Deploy Konwertera SF na Hostinger VPS z Docker Manager
 
+**Docelowy URL:** https://konwersja.analizy.io
+
 ## Spis treści
 1. [Wymagania](#wymagania)
-2. [Opcja A: Przez Hostinger Docker Manager (GUI)](#opcja-a-przez-hostinger-docker-manager-gui)
-3. [Opcja B: Przez SSH (tradycyjna metoda)](#opcja-b-przez-ssh-tradycyjna-metoda)
-4. [Konfiguracja domeny i SSL](#konfiguracja-domeny-i-ssl)
-5. [Utworzenie konta admina](#utworzenie-konta-admina)
-6. [Zarządzanie i monitoring](#zarządzanie-i-monitoring)
+2. [Konfiguracja DNS](#konfiguracja-dns)
+3. [Opcja A: Przez Hostinger Docker Manager (GUI)](#opcja-a-przez-hostinger-docker-manager-gui)
+4. [Opcja B: Przez SSH (tradycyjna metoda)](#opcja-b-przez-ssh-tradycyjna-metoda)
+5. [Konfiguracja Nginx i SSL](#konfiguracja-nginx-i-ssl)
+6. [Utworzenie konta admina](#utworzenie-konta-admina)
+7. [Zarządzanie i monitoring](#zarządzanie-i-monitoring)
 
 ---
 
@@ -27,6 +30,32 @@ openssl rand -hex 32
 ```
 
 Zapisz wygenerowany klucz - będzie potrzebny w konfiguracji.
+
+---
+
+## Konfiguracja DNS
+
+### W panelu Hostinger (domena analizy.io)
+
+1. Zaloguj się do panelu Hostinger
+2. Przejdź do: **Domeny → analizy.io → DNS / DNS Zone**
+3. Dodaj rekord **A** dla subdomeny:
+
+| Typ | Nazwa | Wskazuje na | TTL |
+|-----|-------|-------------|-----|
+| A | konwersja | `IP_TWOJEGO_VPS` | 14400 |
+
+4. Poczekaj na propagację DNS (może potrwać do 24h, zazwyczaj 5-30 min)
+
+### Weryfikacja DNS
+
+```bash
+# Sprawdź czy DNS działa
+nslookup konwersja.analizy.io
+
+# lub
+dig konwersja.analizy.io
+```
 
 ---
 
@@ -133,67 +162,80 @@ docker compose -f docker-compose.hostinger.yml logs -f
 
 ---
 
-## Konfiguracja domeny i SSL
+## Konfiguracja Nginx i SSL
 
-### Opcja 1: Nginx na VPS (zalecane)
-
-#### Instalacja Nginx
+### Krok 1: Instalacja Nginx i Certbot
 
 ```bash
 apt update
 apt install -y nginx certbot python3-certbot-nginx
 ```
 
-#### Konfiguracja
+### Krok 2: Skopiuj konfigurację Nginx
 
+Plik konfiguracyjny jest już przygotowany: `web/nginx/konwersja.analizy.io.conf`
+
+**Opcja A: Przez SCP (z lokalnego komputera)**
 ```bash
-nano /etc/nginx/sites-available/konwerter-sf
+scp web/nginx/konwersja.analizy.io.conf root@IP_VPS:/etc/nginx/sites-available/
 ```
 
-Wklej (zamień domenę):
-
-```nginx
-server {
-    listen 80;
-    server_name konwerter.twojadomena.pl;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-        client_max_body_size 20M;
-    }
-}
+**Opcja B: Przez SSH (ręcznie)**
+```bash
+nano /etc/nginx/sites-available/konwersja.analizy.io.conf
+# Wklej zawartość pliku web/nginx/konwersja.analizy.io.conf
 ```
 
-#### Aktywacja
+**Opcja C: Przez git (jeśli sklonowałeś repo)**
+```bash
+cp ~/konwerter-sf/web/nginx/konwersja.analizy.io.conf /etc/nginx/sites-available/
+```
+
+### Krok 3: Aktywacja konfiguracji
 
 ```bash
-ln -s /etc/nginx/sites-available/konwerter-sf /etc/nginx/sites-enabled/
+# Utwórz symlink
+ln -s /etc/nginx/sites-available/konwersja.analizy.io.conf /etc/nginx/sites-enabled/
+
+# Sprawdź poprawność konfiguracji
 nginx -t
+
+# Przeładuj Nginx
 systemctl reload nginx
 ```
 
-#### Certyfikat SSL
+### Krok 4: Certyfikat SSL (Let's Encrypt)
 
 ```bash
-certbot --nginx -d konwerter.twojadomena.pl
+certbot --nginx -d konwersja.analizy.io
 ```
 
-### Opcja 2: Cloudflare (prostsze)
+Certbot automatycznie:
+- Uzyska certyfikat SSL
+- Zmodyfikuje konfigurację Nginx
+- Doda przekierowanie HTTP → HTTPS
+- Skonfiguruje automatyczne odnawianie
 
-1. Przenieś domenę do Cloudflare (lub dodaj jako zewnętrzną)
-2. Ustaw rekord A: `konwerter` → IP VPS
+### Weryfikacja SSL
+
+```bash
+# Sprawdź status certyfikatu
+certbot certificates
+
+# Test automatycznego odnowienia
+certbot renew --dry-run
+```
+
+### Alternatywa: Cloudflare
+
+Jeśli wolisz Cloudflare zamiast Let's Encrypt:
+
+1. Dodaj domenę `analizy.io` do Cloudflare
+2. Ustaw rekord A: `konwersja` → IP VPS
 3. Włącz Proxy (pomarańczowa chmurka)
-4. SSL/TLS → Full
+4. SSL/TLS → **Full (strict)**
 
-Cloudflare automatycznie zapewni SSL.
+W tym przypadku pomiń kroki z certbot.
 
 ---
 
@@ -207,7 +249,7 @@ docker exec -it konwerter-sf bash
 
 # Utwórz admina
 cd /app
-python create_admin.py admin@twojadomena.pl TwojeHaslo123
+python create_admin.py admin@analizy.io TwojeHaslo123
 
 # Wyjdź
 exit
@@ -219,7 +261,7 @@ W panelu Hostinger Docker Manager:
 1. Znajdź projekt "konwerter-sf"
 2. Kliknij na kontener
 3. Użyj funkcji "Terminal" lub "Exec"
-4. Wykonaj: `python create_admin.py admin@twojadomena.pl TwojeHaslo123`
+4. Wykonaj: `python create_admin.py admin@analizy.io TwojeHaslo123`
 
 ---
 
@@ -311,4 +353,14 @@ docker stats --no-stream
 
 ---
 
-*Dokumentacja: 01.12.2024*
+## Pliki do wdrożenia
+
+| Plik | Cel | Opis |
+|------|-----|------|
+| `docker-compose.hostinger.yml` | Docker | Konfiguracja kontenerów |
+| `nginx/konwersja.analizy.io.conf` | Nginx | Reverse proxy + cache |
+| `.env` | Aplikacja | Zmienne środowiskowe (tworzysz na VPS) |
+
+---
+
+*Dokumentacja: 01.12.2025 | Domena: konwersja.analizy.io*
