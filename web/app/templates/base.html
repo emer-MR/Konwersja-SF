@@ -141,15 +141,11 @@
     </header>
 
     <main class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        {% if message %}
+        <div class="alert alert-{{ message_category|default('info') }}">
+            {{ message }}
+        </div>
+        {% endif %}
 
         {% block content %}{% endblock %}
     </main>
