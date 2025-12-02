@@ -1,12 +1,17 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" data-theme="teal">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d9488">
     <title>{% block title %}Konwerter SF{% endblock %}</title>
 
     <!-- Pico CSS - minimalistyczny framework -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+
+    <!-- Custom Themes & Styles -->
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
 
     <!-- HTMX - dynamika bez JS -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -15,117 +20,32 @@
     {% block head_extra %}{% endblock %}
 
     <style>
+        /* Inline overrides for Pico compatibility */
         :root {
             --pico-font-size: 16px;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        header {
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--pico-muted-border-color);
-        }
-
-        header nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        header .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        header .nav-menu {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        header .nav-menu a {
-            padding: 0.25rem 0.75rem;
-            text-decoration: none;
-            border-radius: var(--pico-border-radius);
-        }
-
-        header .nav-menu a:hover {
-            background-color: var(--pico-secondary-background);
-        }
-
-        header .nav-links {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .alert {
-            padding: 1rem;
-            border-radius: var(--pico-border-radius);
-            margin-bottom: 1rem;
-        }
-
-        .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .alert-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .limit-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background-color: var(--pico-secondary-background);
-            border-radius: 1rem;
-            font-size: 0.875rem;
-        }
-
-        .limit-badge.warning {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        .limit-badge.danger {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
+        /* Legacy styles kept for backward compatibility */
         .upload-area {
-            border: 2px dashed var(--pico-muted-border-color);
-            border-radius: var(--pico-border-radius);
-            padding: 2rem;
+            border: 2px dashed var(--theme-border, var(--pico-muted-border-color));
+            border-radius: var(--border-radius-xl, var(--pico-border-radius));
+            padding: 3rem 2rem;
             text-align: center;
             margin-bottom: 1rem;
-            transition: border-color 0.3s;
+            transition: all 0.3s ease;
+            background: var(--theme-bg-secondary);
+            cursor: pointer;
         }
 
         .upload-area:hover {
-            border-color: var(--pico-primary);
+            border-color: var(--theme-primary, var(--pico-primary));
+            background: var(--theme-bg-tertiary);
         }
 
         .upload-area.dragover {
-            border-color: var(--pico-primary);
-            background-color: var(--pico-secondary-background);
+            border-color: var(--theme-primary, var(--pico-primary));
+            background-color: var(--theme-bg-tertiary, var(--pico-secondary-background));
+            transform: scale(1.02);
         }
 
         .history-table {
@@ -134,29 +54,6 @@
 
         .history-table td {
             vertical-align: middle;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: bold;
-        }
-
-        .status-success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .status-error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
         }
 
         /* HTMX loading indicator */
@@ -176,8 +73,8 @@
             display: inline-block;
             width: 1rem;
             height: 1rem;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid var(--pico-primary);
+            border: 2px solid var(--theme-border, #f3f3f3);
+            border-top: 2px solid var(--theme-primary, var(--pico-primary));
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-right: 0.5rem;
@@ -188,115 +85,82 @@
             100% { transform: rotate(360deg); }
         }
 
-        footer {
-            margin-top: 3rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--pico-muted-border-color);
-            text-align: center;
-            font-size: 0.875rem;
-            color: var(--pico-muted-color);
-        }
-
-        /* Lepszy kontrast przycisków */
-        button:not(.outline),
-        [role="button"]:not(.outline),
-        input[type="submit"]:not(.outline),
-        input[type="button"]:not(.outline) {
-            background-color: #0d6efd !important;
-            border-color: #0d6efd !important;
-            color: #fff !important;
-        }
-
-        button:not(.outline):hover,
-        [role="button"]:not(.outline):hover,
-        input[type="submit"]:not(.outline):hover,
-        input[type="button"]:not(.outline):hover {
-            background-color: #0b5ed7 !important;
-            border-color: #0b5ed7 !important;
-        }
-
-        /* Przyciski outline */
-        button.outline,
-        [role="button"].outline {
-            background-color: transparent !important;
-            color: #0d6efd !important;
-            border-color: #0d6efd !important;
-        }
-
-        button.outline:hover,
-        [role="button"].outline:hover {
-            background-color: #0d6efd !important;
-            color: #fff !important;
-        }
-
-        /* Przyciski secondary */
-        button.secondary,
-        [role="button"].secondary,
-        button.outline.secondary,
-        [role="button"].outline.secondary {
-            background-color: transparent !important;
-            color: #6c757d !important;
-            border-color: #6c757d !important;
-        }
-
-        button.secondary:hover,
-        [role="button"].secondary:hover,
-        button.outline.secondary:hover,
-        [role="button"].outline.secondary:hover {
-            background-color: #6c757d !important;
-            color: #fff !important;
-        }
-
-        /* Tagi z lepszym kontrastem */
+        /* Tags */
         .tag {
-            background-color: #495057 !important;
-            color: #fff !important;
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background-color: var(--theme-secondary, #495057);
+            color: var(--theme-text-inverse, #fff);
+            border-radius: var(--border-radius-full, 1rem);
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: background-color 0.2s;
         }
 
         .tag:hover {
-            background-color: #343a40 !important;
-            color: #fff !important;
+            background-color: var(--theme-secondary-dark, #343a40);
+            color: var(--theme-text-inverse, #fff);
         }
     </style>
 </head>
 <body>
-    <main class="container">
-        <header>
+    <header class="main-header">
+        <div class="container">
             <nav>
-                <a href="/" class="logo">Konwerter SF</a>
+                <a href="/" class="logo">
+                    <span class="logo-icon">A</span>
+                    analizy.io
+                </a>
                 <div class="nav-menu">
-                    <a href="/">Strona główna</a>
-                    <a href="/blog">Wiadomości</a>
-                    <a href="/convert">Konwerter</a>
+                    <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Strona główna</a>
+                    <a href="/blog" {% if '/blog' in request.path %}class="active"{% endif %}>Wiadomości</a>
+                    <a href="/convert" {% if '/convert' in request.path %}class="active"{% endif %}>Konwerter</a>
                     {% if menu_pages %}
                         {% for page in menu_pages %}
                             {% if page.slug != 'home' %}
-                            <a href="/strona/{{ page.slug }}">{{ page.title }}</a>
+                            <a href="/strona/{{ page.slug }}" {% if request.path == '/strona/' + page.slug %}class="active"{% endif %}>{{ page.title }}</a>
                             {% endif %}
                         {% endfor %}
                     {% endif %}
                 </div>
                 <div class="nav-links">
+                    <div class="theme-switcher" id="theme-switcher"></div>
                     {% if user %}
-                        <span>{{ user.email }}</span>
+                        <span class="text-muted">{{ user.email }}</span>
                         {% if user.is_admin %}
-                        <a href="/admin" role="button" class="outline">Admin</a>
+                        <a href="/admin" role="button" class="outline btn-sm">Admin</a>
                         {% endif %}
-                        <a href="/logout" role="button" class="outline secondary">Wyloguj</a>
+                        <a href="/logout" role="button" class="secondary btn-sm">Wyloguj</a>
                     {% else %}
-                        <a href="/login">Zaloguj</a>
-                        <a href="/register" role="button">Zarejestruj</a>
+                        <a href="/login" class="btn-ghost">Zaloguj</a>
+                        <a href="/register" role="button" class="btn-sm">Zarejestruj</a>
                     {% endif %}
                 </div>
             </nav>
-        </header>
+        </div>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
         {% block content %}{% endblock %}
-
-        <footer>
-            <p>Konwerter Sprawozdań Finansowych XML &rarr; XLSX</p>
-            <p>Pełna wersja (Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale, Rachunek przepływów)</p>
-        </footer>
     </main>
+
+    <footer class="main-footer">
+        <div class="container">
+            <p>&copy; 2025 analizy.io &middot; Narzędzia dla profesjonalistów</p>
+        </div>
+    </footer>
+
+    <!-- Theme Switcher JS -->
+    <script src="/static/js/theme-switcher.js"></script>
 </body>
 </html>
