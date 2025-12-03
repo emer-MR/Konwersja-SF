@@ -1,9 +1,5 @@
-# Docker Compose dla Hostinger VPS
+# Docker Compose dla Hostinger VPS - Czytnik SF
 # Może być użyty przez Docker Manager (GUI) lub SSH
-#
-# Użycie przez Docker Manager:
-#   1. Wklej URL: https://raw.githubusercontent.com/emer-MR/Konwersja-SF/main/web/docker-compose.hostinger.yml
-#   2. Uzupełnij zmienne środowiskowe w formularzu
 #
 # Użycie przez SSH:
 #   docker compose -f docker-compose.hostinger.yml up -d
@@ -15,41 +11,17 @@ services:
     build:
       context: ..
       dockerfile: web/Dockerfile.prod
-    container_name: konwerter-sf
-    restart: unless-stopped
-
-    # Traefik Labels
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.konwerter.rule=Host(`konwersja.analizy.io`)
-# Docker Compose dla Hostinger VPS
-# Może być użyty przez Docker Manager (GUI) lub SSH
-#
-# Użycie przez Docker Manager:
-#   1. Wklej URL: https://raw.githubusercontent.com/emer-MR/Konwersja-SF/main/web/docker-compose.hostinger.yml
-#   2. Uzupełnij zmienne środowiskowe w formularzu
-#
-# Użycie przez SSH:
-#   docker compose -f docker-compose.hostinger.yml up -d
-
-version: '3.8'
-
-services:
-  web:
-    build:
-      context: ..
-      dockerfile: web/Dockerfile.prod
-    container_name: konwerter-sf
+    container_name: czytnik-sf
     restart: unless-stopped
 
     # Traefik Labels - KLUCZOWE DLA DZIAŁANIA DOMENY
     labels:
       - traefik.enable=true
-      - traefik.http.routers.konwerter.rule=Host(`konwersja.analizy.io`)
-      - traefik.http.routers.konwerter.tls=true
-      - traefik.http.routers.konwerter.entrypoints=web,websecure
-      - traefik.http.routers.konwerter.tls.certresolver=mytlschallenge
-      - traefik.http.services.konwerter.loadbalancer.server.port=8000
+      - traefik.http.routers.czytnik.rule=Host(`czytnik.analizy.io`)
+      - traefik.http.routers.czytnik.tls=true
+      - traefik.http.routers.czytnik.entrypoints=web,websecure
+      - traefik.http.routers.czytnik.tls.certresolver=mytlschallenge
+      - traefik.http.services.czytnik.loadbalancer.server.port=8000
       - traefik.docker.network=root_default
 
     networks:
@@ -62,14 +34,21 @@ services:
       - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY:-}
       - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:-}
 
+      # Google Analytics
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-G-BD3959F2HL}
+
       # Opcjonalne - domyślne wartości
       - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/app.db}
-      - MAX_CONVERSIONS_PER_DAY=${MAX_CONVERSIONS_PER_DAY:-20}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-15}
+      - ADMIN_FILE_RETENTION_DAYS=${ADMIN_FILE_RETENTION_DAYS:-30}
       - DEBUG=${DEBUG:-false}
 
+      # Dane kontaktowe
+      - CONTACT_EMAIL=${CONTACT_EMAIL:-kontakt@analizy.io}
+      - CONTACT_ADDRESS=${CONTACT_ADDRESS:-}
+
     volumes:
-      - konwerter_data:/app/data
+      - czytnik_data:/app/data
 
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
@@ -92,7 +71,7 @@ services:
         max-file: "3"
 
 volumes:
-  konwerter_data:
+  czytnik_data:
     driver: local
 
 networks:

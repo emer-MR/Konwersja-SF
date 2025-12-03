@@ -1,33 +1,58 @@
 """
-Główna aplikacja FastAPI.
+Główna aplikacja FastAPI - Czytnik SF.
+Uproszczona wersja bez rejestracji użytkowników.
 """
 
 import httpx
+import uuid
+import shutil
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.config import settings
 from app.database import init_db, get_db
 from app.auth import (
     get_current_user_optional,
     get_current_user,
-    get_user_by_email,
-    create_user,
     authenticate_user,
     create_access_token,
 )
-from app.models import User, StaticPage
-from app.api.auth_routes import router as auth_router
-from app.api.convert_routes import router as convert_router
-from app.api.blog_routes import router as blog_router
+from app.models import User, Conversion
 from app.xml_validator import validate_xml
+
+
+# Przechowywanie tymczasowych plików w pamięci (session_id -> file_info)
+temp_files: dict[str, dict] = {}
+
+
+async def cleanup_expired_files():
+    """Zadanie w tle - usuwa wygasłe pliki."""
+    while True:
+        await asyncio.sleep(60)  # Sprawdzaj co minutę
+        now = datetime.now()
+        expired = []
+        for session_id, file_info in temp_files.items():
+            if file_info["expires_at"] < now:
+                expired.append(session_id)
+                # Usuń plik
+                try:
+                    file_path = Path(file_info["path"])
+                    if file_path.exists():
+                        file_path.unlink()
+                except Exception:
+                    pass
+        for session_id in expired:
+            del temp_files[session_id]
 
 
 @asynccontextmanager
@@ -35,17 +60,25 @@ async def lifespan(app: FastAPI):
     """Inicjalizacja przy starcie aplikacji."""
     # Utwórz katalogi
     Path("./data").mkdir(exist_ok=True)
-    Path("./data/uploads/images").mkdir(parents=True, exist_ok=True)
     settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     settings.ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    settings.ADMIN_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Inicjalizuj bazę danych
     await init_db()
 
+    # Uruchom zadanie czyszczące
+    cleanup_task = asyncio.create_task(cleanup_expired_files())
+
     yield
 
-    # Cleanup (opcjonalnie)
+    # Cleanup
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
 
 async def verify_recaptcha(recaptcha_response: str) -> bool:
@@ -54,7 +87,6 @@ async def verify_recaptcha(recaptcha_response: str) -> bool:
         return True
 
     if not settings.RECAPTCHA_SECRET_KEY:
-        # Jeśli klucz nie jest skonfigurowany, pomijamy weryfikację
         return True
 
     if not recaptcha_response:
@@ -87,281 +119,64 @@ static_path = Path(__file__).parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-# Katalog na uploady (obrazy do bloga)
-uploads_path = Path("./data/uploads")
-if uploads_path.exists():
-    app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
 
-# Routery API
-app.include_router(auth_router)
-app.include_router(blog_router)  # Blog i panel admina
-# app.include_router(convert_router)  # wyłączone - używamy HTMX endpointów
-
-
-# ============== POMOCNICZE FUNKCJE ==============
-
-async def get_menu_pages(db: AsyncSession):
-    """Pobiera strony statyczne do menu."""
-    from sqlalchemy import select
-    result = await db.execute(
-        select(StaticPage)
-        .where(StaticPage.is_in_menu == True)
-        .order_by(StaticPage.menu_order)
-    )
-    return result.scalars().all()
-
-
-# ============== STRONY HTML ==============
+# ============== STRONY PUBLICZNE ==============
 
 @app.get("/", response_class=HTMLResponse)
-async def home(
-    request: Request,
-    user: Optional[User] = Depends(get_current_user_optional),
-    db: AsyncSession = Depends(get_db),
-):
-    """Strona główna."""
-    from sqlalchemy import select
-
-    # Pobierz stronę "home" z bazy
-    result = await db.execute(
-        select(StaticPage).where(StaticPage.slug == "home")
-    )
-    home_page = result.scalar_one_or_none()
-
-    menu_pages = await get_menu_pages(db)
-
+async def home(request: Request):
+    """Strona główna z konwerterem."""
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
-            "user": user,
-            "home_page": home_page,
-            "menu_pages": menu_pages,
-        },
-    )
-
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(
-    request: Request,
-    user: Optional[User] = Depends(get_current_user_optional),
-):
-    """Strona logowania."""
-    if user:
-        return RedirectResponse(url="/convert", status_code=status.HTTP_302_FOUND)
-
-    return templates.TemplateResponse(
-        "login.html",
-        {"request": request, "user": None, "error": None},
-    )
-
-
-@app.post("/login", response_class=HTMLResponse)
-async def login_submit(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: AsyncSession = Depends(get_db),
-):
-    """Obsługa formularza logowania."""
-    user = await authenticate_user(db, email, password)
-
-    if not user:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "user": None, "error": "Nieprawidłowy email lub hasło"},
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
-
-    # Utwórz token i ustaw cookie
-    access_token = create_access_token(data={"sub": str(user.id)})
-
-    response = RedirectResponse(url="/convert", status_code=status.HTTP_302_FOUND)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=60 * 60 * 24,  # 24 godziny
-        samesite="lax",
-    )
-    return response
-
-
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(
-    request: Request,
-    user: Optional[User] = Depends(get_current_user_optional),
-):
-    """Strona rejestracji."""
-    if user:
-        return RedirectResponse(url="/convert", status_code=status.HTTP_302_FOUND)
-
-    return templates.TemplateResponse(
-        "register.html",
-        {"request": request, "user": None, "error": None, "success": None},
-    )
-
-
-@app.post("/register", response_class=HTMLResponse)
-async def register_submit(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    password_confirm: str = Form(...),
-    db: AsyncSession = Depends(get_db),
-):
-    """Obsługa formularza rejestracji."""
-    error = None
-
-    # Walidacja
-    if password != password_confirm:
-        error = "Hasła nie są identyczne"
-    elif len(password) < 8:
-        error = "Hasło musi mieć co najmniej 8 znaków"
-    else:
-        # Sprawdź czy email istnieje
-        existing_user = await get_user_by_email(db, email)
-        if existing_user:
-            error = "Ten adres email jest już zarejestrowany"
-
-    if error:
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "user": None, "error": error, "success": None},
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Utwórz użytkownika
-    await create_user(db, email, password)
-
-    return templates.TemplateResponse(
-        "register.html",
-        {
-            "request": request,
-            "user": None,
-            "error": None,
-            "success": "Konto utworzone! Możesz się teraz zalogować.",
-        },
-    )
-
-
-@app.get("/logout")
-async def logout():
-    """Wylogowanie."""
-    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-    response.delete_cookie("access_token")
-    return response
-
-
-@app.get("/convert", response_class=HTMLResponse)
-async def convert_page(
-    request: Request,
-    user: User = Depends(get_current_user),
-):
-    """Strona konwersji (wymaga logowania)."""
-    return templates.TemplateResponse(
-        "convert.html",
-        {
-            "request": request,
-            "user": user,
             "recaptcha_site_key": settings.RECAPTCHA_SITE_KEY,
             "recaptcha_enabled": settings.RECAPTCHA_ENABLED and bool(settings.RECAPTCHA_SITE_KEY),
+            "ga_measurement_id": settings.GA_MEASUREMENT_ID,
+            "contact_email": settings.CONTACT_EMAIL,
+            "contact_address": settings.CONTACT_ADDRESS,
         },
     )
 
 
-# ============== HTMX PARTIALS ==============
-
-@app.get("/htmx/history", response_class=HTMLResponse)
-async def htmx_history(
-    request: Request,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Fragment HTML z historią konwersji (dla HTMX)."""
-    from sqlalchemy import select
-    from app.models import Conversion
-
-    result = await db.execute(
-        select(Conversion)
-        .where(Conversion.user_id == user.id)
-        .order_by(Conversion.created_at.desc())
-        .limit(20)
-    )
-    conversions = result.scalars().all()
-
-    # Dodaj download_url do każdej konwersji
-    conv_list = []
-    for conv in conversions:
-        conv_dict = {
-            "id": conv.id,
-            "input_filename": conv.input_filename,
-            "company_name": conv.company_name,
-            "status": conv.status,
-            "error_message": conv.error_message,
-            "created_at": conv.created_at,
-            "download_url": None,
-        }
-        if conv.status == "success" and conv.output_path:
-            output_path = Path(conv.output_path)
-            if output_path.exists():
-                conv_dict["download_url"] = f"/api/convert/download/{conv.id}"
-        conv_list.append(conv_dict)
-
+@app.get("/polityka-prywatnosci", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    """Polityka prywatności."""
     return templates.TemplateResponse(
-        "partials/history_table.html",
-        {"request": request, "conversions": conv_list},
-    )
-
-
-@app.get("/htmx/limit", response_class=HTMLResponse)
-async def htmx_limit(
-    request: Request,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Fragment HTML z limitem dziennym (dla HTMX)."""
-    from datetime import date
-    from sqlalchemy import select, func
-    from app.models import Conversion
-
-    today = date.today()
-    result = await db.execute(
-        select(func.count(Conversion.id))
-        .where(Conversion.user_id == user.id)
-        .where(func.date(Conversion.created_at) == today)
-    )
-    used = result.scalar() or 0
-    remaining = max(0, settings.MAX_CONVERSIONS_PER_DAY - used)
-
-    return templates.TemplateResponse(
-        "partials/limit_badge.html",
+        "privacy.html",
         {
             "request": request,
-            "used": used,
-            "limit": settings.MAX_CONVERSIONS_PER_DAY,
-            "remaining": remaining,
+            "ga_measurement_id": settings.GA_MEASUREMENT_ID,
+            "contact_email": settings.CONTACT_EMAIL,
         },
     )
 
 
-# ============== OVERRIDE API CONVERT DLA HTMX ==============
+@app.get("/regulamin", response_class=HTMLResponse)
+async def terms(request: Request):
+    """Regulamin."""
+    return templates.TemplateResponse(
+        "terms.html",
+        {
+            "request": request,
+            "ga_measurement_id": settings.GA_MEASUREMENT_ID,
+            "contact_email": settings.CONTACT_EMAIL,
+        },
+    )
+
+
+# ============== KONWERSJA (HTMX) ==============
 
 @app.post("/htmx/convert", response_class=HTMLResponse)
 async def htmx_convert(
     request: Request,
-    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Endpoint konwersji zwracający HTML (dla HTMX).
+    Dostępny bez logowania.
     """
-    import uuid
     import json
     import aiofiles
-    from datetime import date
-    from sqlalchemy import select, func
-    from app.models import Conversion
     from app.converter_simple import convert_file
 
     # Pobierz dane formularza
@@ -380,25 +195,6 @@ async def htmx_convert(
                     "error_message": "Weryfikacja reCAPTCHA nie powiodła się. Spróbuj ponownie.",
                 },
             )
-
-    # Sprawdź limit dzienny
-    today = date.today()
-    result = await db.execute(
-        select(func.count(Conversion.id))
-        .where(Conversion.user_id == user.id)
-        .where(func.date(Conversion.created_at) == today)
-    )
-    today_count = result.scalar() or 0
-
-    if today_count >= settings.MAX_CONVERSIONS_PER_DAY:
-        return templates.TemplateResponse(
-            "partials/conversion_result.html",
-            {
-                "request": request,
-                "status": "error",
-                "error_message": f"Przekroczono dzienny limit {settings.MAX_CONVERSIONS_PER_DAY} konwersji.",
-            },
-        )
 
     # Pobierz plik z formularza
     file = form.get("file")
@@ -449,24 +245,14 @@ async def htmx_convert(
             },
         )
 
-    # Utwórz rekord konwersji
-    conversion = Conversion(
-        user_id=user.id,
-        input_filename=filename,
-        input_size_bytes=len(content),
-        status="pending",
-    )
-    db.add(conversion)
-    await db.flush()
-
-    # Generuj ścieżki
-    unique_id = str(uuid.uuid4())
-    input_path = settings.UPLOAD_DIR / f"{unique_id}.xml"
-    output_path = settings.OUTPUT_DIR / f"{unique_id}.xlsx"
-    attachments_subdir = settings.ATTACHMENTS_DIR / unique_id
+    # Generuj unikalne ID sesji
+    session_id = str(uuid.uuid4())
+    input_path = settings.UPLOAD_DIR / f"{session_id}.xml"
+    output_path = settings.OUTPUT_DIR / f"{session_id}.xlsx"
+    attachments_subdir = settings.ATTACHMENTS_DIR / session_id
 
     try:
-        # Zapisz plik
+        # Zapisz plik wejściowy
         async with aiofiles.open(input_path, 'wb') as f:
             await f.write(content)
 
@@ -476,35 +262,55 @@ async def htmx_convert(
         # Konwertuj
         metadata = convert_file(str(input_path), str(output_path), str(attachments_subdir))
 
-        # Aktualizuj rekord
-        conversion.status = "success"
-        conversion.output_filename = metadata["output_filename"]
-        conversion.output_path = str(output_path)
-        conversion.company_name = metadata.get("company_name")
-        conversion.company_nip = metadata.get("company_nip")
-        conversion.entity_type = metadata.get("entity_type")
-        conversion.period_from = metadata.get("period_from")
-        conversion.period_to = metadata.get("period_to")
+        # Zapisz do bazy danych (dla admina)
+        conversion = Conversion(
+            input_filename=filename,
+            company_name=metadata.get("company_name"),
+            company_nip=metadata.get("company_nip"),
+        )
 
-        # Zapisz informacje o załącznikach jako JSON w nowej kolumnie (lub w error_message tymczasowo)
+        # Archiwizuj dla admina (jeśli włączone)
+        if settings.ADMIN_FILE_RETENTION_DAYS > 0:
+            archive_dir = settings.ADMIN_ARCHIVE_DIR / session_id
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_xlsx = archive_dir / f"{session_id}.xlsx"
+            shutil.copy2(output_path, archive_xlsx)
+            conversion.archive_path = str(archive_xlsx)
+
+        db.add(conversion)
+        await db.commit()
+
+        # Zapisz plik tymczasowy dla użytkownika (5 minut)
+        temp_files[session_id] = {
+            "path": str(output_path),
+            "filename": metadata["output_filename"],
+            "expires_at": datetime.now() + timedelta(minutes=settings.USER_FILE_EXPIRY_MINUTES),
+        }
+
+        # Przygotuj załączniki do odpowiedzi
         attachments = metadata.get("attachments", [])
         if attachments:
-            conversion.attachments_json = json.dumps(attachments, ensure_ascii=False)
-
-        await db.flush()
+            for att in attachments:
+                att_session_id = f"{session_id}_att_{att['id']}"
+                temp_files[att_session_id] = {
+                    "path": att["path"],
+                    "filename": att.get("original_name", f"zalacznik.{att.get('extension', 'bin')}"),
+                    "expires_at": datetime.now() + timedelta(minutes=settings.USER_FILE_EXPIRY_MINUTES),
+                }
+                att["download_url"] = f"/download/{att_session_id}"
 
         return templates.TemplateResponse(
             "partials/conversion_result.html",
             {
                 "request": request,
                 "status": "success",
-                "conversion_id": conversion.id,
-                "download_url": f"/api/convert/download/{conversion.id}",
-                "company_name": conversion.company_name,
-                "company_nip": conversion.company_nip,
-                "entity_type": conversion.entity_type,
-                "period_from": conversion.period_from,
-                "period_to": conversion.period_to,
+                "session_id": session_id,
+                "download_url": f"/download/{session_id}",
+                "company_name": metadata.get("company_name"),
+                "company_nip": metadata.get("company_nip"),
+                "entity_type": metadata.get("entity_type"),
+                "period_from": metadata.get("period_from"),
+                "period_to": metadata.get("period_to"),
                 "jednostka_walutowa": metadata.get("jednostka_walutowa", "PLN"),
                 "wariant_rzis": metadata.get("wariant_rzis", "porownawczy"),
                 "preview": metadata.get("preview", {}),
@@ -513,10 +319,6 @@ async def htmx_convert(
         )
 
     except Exception as e:
-        conversion.status = "error"
-        conversion.error_message = str(e)[:500]
-        await db.flush()
-
         return templates.TemplateResponse(
             "partials/conversion_result.html",
             {
@@ -527,157 +329,172 @@ async def htmx_convert(
         )
 
     finally:
+        # Usuń plik wejściowy
         if input_path.exists():
             input_path.unlink()
 
 
-@app.get("/api/convert/download/{conversion_id}")
-async def download_file(
-    conversion_id: int,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Pobieranie pliku XLSX."""
-    from fastapi.responses import FileResponse
-    from sqlalchemy import select
-    from app.models import Conversion
+@app.get("/download/{session_id}")
+async def download_file(session_id: str):
+    """Pobieranie pliku XLSX (tymczasowy link)."""
+    if session_id not in temp_files:
+        raise HTTPException(status_code=404, detail="Plik nie istnieje lub wygasł")
 
-    result = await db.execute(
-        select(Conversion)
-        .where(Conversion.id == conversion_id)
-        .where(Conversion.user_id == user.id)
-    )
-    conversion = result.scalar_one_or_none()
+    file_info = temp_files[session_id]
 
-    if not conversion:
-        raise HTTPException(status_code=404, detail="Konwersja nie znaleziona")
+    # Sprawdź czy nie wygasł
+    if file_info["expires_at"] < datetime.now():
+        del temp_files[session_id]
+        raise HTTPException(status_code=404, detail="Link do pobrania wygasł")
 
-    if conversion.status != "success" or not conversion.output_path:
-        raise HTTPException(status_code=400, detail="Plik niedostępny")
-
-    output_path = Path(conversion.output_path)
-    if not output_path.exists():
+    file_path = Path(file_info["path"])
+    if not file_path.exists():
+        del temp_files[session_id]
         raise HTTPException(status_code=404, detail="Plik nie istnieje")
 
     return FileResponse(
-        path=output_path,
-        filename=conversion.output_filename or f"konwersja_{conversion_id}.xlsx",
+        path=file_path,
+        filename=file_info["filename"],
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
-@app.get("/api/convert/attachment/{conversion_id}/{attachment_id}")
-async def download_attachment(
-    conversion_id: int,
-    attachment_id: str,
+# ============== PANEL ADMINISTRACYJNY ==============
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(
+    request: Request,
+    user: Optional[User] = Depends(get_current_user_optional),
+):
+    """Strona logowania admina."""
+    if user and user.is_admin:
+        return RedirectResponse(url="/admin", status_code=status.HTTP_302_FOUND)
+
+    return templates.TemplateResponse(
+        "admin/login.html",
+        {"request": request, "error": None, "ga_measurement_id": settings.GA_MEASUREMENT_ID},
+    )
+
+
+@app.post("/admin/login", response_class=HTMLResponse)
+async def admin_login_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Obsługa formularza logowania admina."""
+    user = await authenticate_user(db, email, password)
+
+    if not user or not user.is_admin:
+        return templates.TemplateResponse(
+            "admin/login.html",
+            {"request": request, "error": "Nieprawidłowe dane lub brak uprawnień administratora", "ga_measurement_id": settings.GA_MEASUREMENT_ID},
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Utwórz token i ustaw cookie
+    access_token = create_access_token(data={"sub": str(user.id)})
+
+    response = RedirectResponse(url="/admin", status_code=status.HTTP_302_FOUND)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=60 * 60 * 24,
+        samesite="lax",
+    )
+    return response
+
+
+@app.get("/admin/logout")
+async def admin_logout():
+    """Wylogowanie admina."""
+    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    response.delete_cookie("access_token")
+    return response
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Pobieranie pojedynczego załącznika."""
-    import json
-    from fastapi.responses import FileResponse
-    from sqlalchemy import select
-    from app.models import Conversion
+    """Panel administracyjny - lista konwersji."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Brak uprawnień")
 
+    # Pobierz konwersje
     result = await db.execute(
         select(Conversion)
-        .where(Conversion.id == conversion_id)
-        .where(Conversion.user_id == user.id)
+        .order_by(Conversion.created_at.desc())
+        .limit(100)
+    )
+    conversions = result.scalars().all()
+
+    return templates.TemplateResponse(
+        "admin/dashboard.html",
+        {
+            "request": request,
+            "user": user,
+            "conversions": conversions,
+            "retention_days": settings.ADMIN_FILE_RETENTION_DAYS,
+            "ga_measurement_id": settings.GA_MEASUREMENT_ID,
+        },
+    )
+
+
+@app.get("/admin/download/{conversion_id}")
+async def admin_download_file(
+    conversion_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pobieranie pliku z archiwum admina."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Brak uprawnień")
+
+    result = await db.execute(
+        select(Conversion).where(Conversion.id == conversion_id)
     )
     conversion = result.scalar_one_or_none()
 
-    if not conversion:
-        raise HTTPException(status_code=404, detail="Konwersja nie znaleziona")
+    if not conversion or not conversion.archive_path:
+        raise HTTPException(status_code=404, detail="Plik nie znaleziony")
 
-    if not conversion.attachments_json:
-        raise HTTPException(status_code=404, detail="Brak załączników")
-
-    # Znajdź załącznik
-    attachments = json.loads(conversion.attachments_json)
-    attachment = None
-    for att in attachments:
-        if att.get("id") == attachment_id:
-            attachment = att
-            break
-
-    if not attachment:
-        raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
-
-    file_path = Path(attachment["path"])
+    file_path = Path(conversion.archive_path)
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Plik załącznika nie istnieje")
+        raise HTTPException(status_code=404, detail="Plik nie istnieje na dysku")
 
-    # Określ typ MIME
-    ext = attachment.get("extension", "").lower()
-    mime_types = {
-        "pdf": "application/pdf",
-        "doc": "application/msword",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "xls": "application/vnd.ms-excel",
-        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "txt": "text/plain",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-    }
-    media_type = mime_types.get(ext, "application/octet-stream")
+    filename = f"{conversion.company_name or 'sprawozdanie'}_{conversion.id}.xlsx"
+    # Sanitize filename
+    filename = "".join(c for c in filename if c not in '<>:"/\\|?*')
 
     return FileResponse(
         path=file_path,
-        filename=attachment.get("original_name", f"zalacznik.{ext}"),
-        media_type=media_type,
+        filename=filename,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
-@app.get("/api/convert/attachments/{conversion_id}")
-async def download_all_attachments(
-    conversion_id: int,
+@app.post("/admin/settings", response_class=HTMLResponse)
+async def admin_update_settings(
+    request: Request,
+    retention_days: int = Form(...),
     user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
-    """Pobieranie wszystkich załączników jako ZIP."""
-    import json
-    import zipfile
-    import io
-    from fastapi.responses import StreamingResponse
-    from sqlalchemy import select
-    from app.models import Conversion
+    """Aktualizacja ustawień admina (wymaga restartu)."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Brak uprawnień")
 
-    result = await db.execute(
-        select(Conversion)
-        .where(Conversion.id == conversion_id)
-        .where(Conversion.user_id == user.id)
-    )
-    conversion = result.scalar_one_or_none()
-
-    if not conversion:
-        raise HTTPException(status_code=404, detail="Konwersja nie znaleziona")
-
-    if not conversion.attachments_json:
-        raise HTTPException(status_code=404, detail="Brak załączników")
-
-    attachments = json.loads(conversion.attachments_json)
-    if not attachments:
-        raise HTTPException(status_code=404, detail="Brak załączników")
-
-    # Utwórz ZIP w pamięci
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for att in attachments:
-            file_path = Path(att["path"])
-            if file_path.exists():
-                zip_file.write(file_path, att.get("original_name", file_path.name))
-
-    zip_buffer.seek(0)
-
-    # Generuj nazwę pliku ZIP
-    company = conversion.company_name or "sprawozdanie"
-    # Usuń znaki niedozwolone
-    company_clean = "".join(c for c in company if c not in '<>:"/\\|?*')[:30]
-    zip_filename = f"zalaczniki_{company_clean}.zip"
-
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'}
+    # Informacja - zmiana wymaga edycji .env i restartu
+    return templates.TemplateResponse(
+        "admin/settings_info.html",
+        {
+            "request": request,
+            "user": user,
+            "message": f"Aby zmienić czas przechowywania na {retention_days} dni, ustaw ADMIN_FILE_RETENTION_DAYS={retention_days} w pliku .env i zrestartuj aplikację.",
+            "ga_measurement_id": settings.GA_MEASUREMENT_ID,
+        },
     )

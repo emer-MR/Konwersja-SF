@@ -179,16 +179,10 @@
                 <p class="attachments-title">Załączniki ({{ attachments|length }}):</p>
 
                 {% for att in attachments %}
-                <a href="/api/convert/attachment/{{ conversion_id }}/{{ att.id }}" role="button" class="download-btn outline">
+                <a href="{{ att.download_url }}" role="button" class="download-btn outline">
                     Pobierz: {{ att.original_name }} ({{ att.size_kb }} KB)
                 </a>
                 {% endfor %}
-
-                {% if attachments|length > 1 %}
-                <a href="/api/convert/attachments/{{ conversion_id }}" role="button" class="download-btn secondary">
-                    Pobierz wszystkie załączniki (ZIP)
-                </a>
-                {% endif %}
             </div>
             {% endif %}
         </div>

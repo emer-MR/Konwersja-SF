@@ -1,45 +1,244 @@
-{% extends "admin/base_admin.html" %}
+{% extends "base.html" %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Panel administracyjny - Czytnik SF{% endblock %}
 
 {% block content %}
-<div class="admin-header">
-    <h1>Dashboard</h1>
+<div class="admin-dashboard">
+    <header class="admin-header">
+        <div>
+            <h1>Panel administracyjny</h1>
+            <p>Zarządzanie konwersjami i archiwum plików</p>
+        </div>
+        <div class="admin-actions">
+            <span class="admin-user">{{ user.email }}</span>
+            <a href="/admin/logout" role="button" class="secondary">Wyloguj</a>
+        </div>
+    </header>
+
+    <!-- Statystyki -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ conversions|length }}</div>
+            <div class="stat-label">Konwersji (ostatnie 100)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ retention_days }}</div>
+            <div class="stat-label">Dni przechowywania</div>
+        </div>
+    </div>
+
+    <!-- Info o ustawieniach -->
+    <article class="settings-info">
+        <h3>Ustawienia archiwizacji</h3>
+        <p>
+            Pliki są przechowywane przez <strong>{{ retention_days }} dni</strong>.
+            {% if retention_days == 0 %}
+            <br><em>Wartość 0 oznacza, że pliki nie są archiwizowane.</em>
+            {% endif %}
+        </p>
+        <p class="muted">
+            Aby zmienić okres przechowywania, ustaw zmienną <code>ADMIN_FILE_RETENTION_DAYS</code>
+            w pliku <code>.env</code> i zrestartuj aplikację.
+        </p>
+    </article>
+
+    <!-- Lista konwersji -->
+    <article>
+        <header>
+            <h2>Historia konwersji</h2>
+        </header>
+
+        {% if conversions %}
+        <div class="table-responsive">
+            <table class="conversions-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Data</th>
+                        <th>Plik</th>
+                        <th>Firma</th>
+                        <th>NIP</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for conv in conversions %}
+                    <tr>
+                        <td>{{ conv.id }}</td>
+                        <td>{{ conv.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="filename">{{ conv.input_filename }}</td>
+                        <td>{{ conv.company_name or '-' }}</td>
+                        <td>{{ conv.company_nip or '-' }}</td>
+                        <td>
+                            {% if conv.archive_path %}
+                            <a href="/admin/download/{{ conv.id }}" class="btn-download" title="Pobierz">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            </a>
+                            {% else %}
+                            <span class="no-file" title="Plik niedostępny">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-state">Brak konwersji w bazie danych.</p>
+        {% endif %}
+    </article>
+
+    <footer class="admin-footer">
+        <a href="/">&larr; Powrót do strony głównej</a>
+    </footer>
 </div>
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-value">{{ stats.posts }}</div>
-        <div class="stat-label">Wpisy bloga</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ stats.pages }}</div>
-        <div class="stat-label">Strony statyczne</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ stats.categories }}</div>
-        <div class="stat-label">Kategorie</div>
-    </div>
-</div>
+<style>
+    .admin-dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
 
-<article>
-    <header>
-        <h3>Szybkie akcje</h3>
-    </header>
-    <div class="admin-actions">
-        <a href="/admin/posts/new" role="button">Nowy wpis</a>
-        <a href="/admin/pages/new" role="button" class="outline">Nowa strona</a>
-        <a href="/admin/categories" role="button" class="outline secondary">Zarzadzaj kategoriami</a>
-    </div>
-</article>
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
 
-<article>
-    <header>
-        <h3>Informacje</h3>
-    </header>
-    <ul>
-        <li>Zalogowany jako: <strong>{{ user.email }}</strong></li>
-        <li>Typ konta: <strong>Administrator</strong></li>
-    </ul>
-</article>
+    .admin-header h1 {
+        margin-bottom: 0.25rem;
+    }
+
+    .admin-header p {
+        color: var(--pico-muted-color);
+        margin: 0;
+    }
+
+    .admin-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .admin-user {
+        color: var(--pico-muted-color);
+    }
+
+    /* Statystyki */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: var(--pico-card-background-color);
+        padding: 1.5rem;
+        border-radius: var(--pico-border-radius);
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--theme-primary, var(--pico-primary));
+    }
+
+    .stat-label {
+        color: var(--pico-muted-color);
+        font-size: 0.9rem;
+    }
+
+    /* Ustawienia */
+    .settings-info {
+        background: var(--pico-card-sectioning-background-color);
+        margin-bottom: 2rem;
+    }
+
+    .settings-info h3 {
+        margin-bottom: 0.5rem;
+    }
+
+    .settings-info .muted {
+        color: var(--pico-muted-color);
+        font-size: 0.875rem;
+    }
+
+    .settings-info code {
+        background: var(--pico-code-background-color);
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+        font-size: 0.85em;
+    }
+
+    /* Tabela */
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .conversions-table {
+        width: 100%;
+        font-size: 0.9rem;
+    }
+
+    .conversions-table th {
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .conversions-table .filename {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .btn-download {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.4rem;
+        background: var(--theme-primary, var(--pico-primary));
+        color: white;
+        border-radius: var(--pico-border-radius);
+        text-decoration: none;
+    }
+
+    .btn-download:hover {
+        background: var(--theme-primary-dark, var(--pico-primary-hover));
+        color: white;
+    }
+
+    .no-file {
+        color: var(--pico-muted-color);
+    }
+
+    .empty-state {
+        text-align: center;
+        color: var(--pico-muted-color);
+        padding: 2rem;
+    }
+
+    .admin-footer {
+        text-align: center;
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--pico-muted-border-color);
+    }
+
+    @media (max-width: 768px) {
+        .admin-header {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .conversions-table {
+            font-size: 0.8rem;
+        }
+    }
+</style>
 {% endblock %}

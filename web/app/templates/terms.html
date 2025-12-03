@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Regulamin - Czytnik SF{% endblock %}
+
+{% block content %}
+<article class="legal-page">
+    <header>
+        <h1>Regulamin serwisu</h1>
+        <p class="last-updated">Ostatnia aktualizacja: grudzień 2025</p>
+    </header>
+
+    <section>
+        <h2>1. Postanowienia ogólne</h2>
+        <p>
+            Niniejszy regulamin określa zasady korzystania z serwisu internetowego czytnik.analizy.io
+            (dalej: "Serwis"), który umożliwia bezpłatną konwersję elektronicznych sprawozdań finansowych
+            z formatu XML na format Excel (XLSX).
+        </p>
+        <p>
+            Właścicielem i administratorem Serwisu jest podmiot dostępny pod adresem:
+            <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.
+        </p>
+    </section>
+
+    <section>
+        <h2>2. Definicje</h2>
+        <ul>
+            <li><strong>Serwis</strong> - strona internetowa czytnik.analizy.io wraz ze wszystkimi funkcjonalnościami</li>
+            <li><strong>Użytkownik</strong> - każda osoba korzystająca z Serwisu</li>
+            <li><strong>Usługa</strong> - bezpłatna konwersja plików XML sprawozdań finansowych na format Excel</li>
+            <li><strong>Sprawozdanie finansowe</strong> - elektroniczne sprawozdanie finansowe zgodne z polskimi standardami (e-Sprawozdanie)</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>3. Zakres usług</h2>
+        <p>Serwis oferuje następujące usługi:</p>
+        <ul>
+            <li>Konwersja plików XML e-Sprawozdań finansowych na format Excel (XLSX)</li>
+            <li>Wyodrębnianie danych z Bilansu, Rachunku Zysków i Strat oraz innych elementów sprawozdania</li>
+            <li>Wyodrębnianie załączników osadzonych w plikach XML</li>
+        </ul>
+        <p>Usługi są świadczone bezpłatnie i nie wymagają rejestracji.</p>
+    </section>
+
+    <section>
+        <h2>4. Zasady korzystania z Serwisu</h2>
+        <p>Użytkownik zobowiązuje się do:</p>
+        <ul>
+            <li>Korzystania z Serwisu zgodnie z jego przeznaczeniem</li>
+            <li>Niepodejmowania działań mogących zakłócić funkcjonowanie Serwisu</li>
+            <li>Nieprzesyłania plików zawierających złośliwe oprogramowanie</li>
+            <li>Nieprzesyłania plików naruszających prawa osób trzecich</li>
+            <li>Nieobchodzenia zabezpieczeń Serwisu (w tym CAPTCHA)</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>5. Przetwarzane pliki</h2>
+        <p>
+            <strong>Pliki wejściowe (XML):</strong> Przesłane pliki są przetwarzane w pamięci serwera
+            i usuwane natychmiast po zakończeniu konwersji.
+        </p>
+        <p>
+            <strong>Pliki wyjściowe (XLSX):</strong> Skonwertowane pliki są dostępne do pobrania
+            przez ograniczony czas (do 5 minut), po czym są automatycznie usuwane.
+        </p>
+        <p>
+            <strong>Metadane:</strong> W celach administracyjnych przechowywane są jedynie podstawowe
+            metadane konwersji (nazwa pliku, nazwa firmy, NIP, data konwersji) - bez treści dokumentów.
+        </p>
+    </section>
+
+    <section>
+        <h2>6. Ograniczenia techniczne</h2>
+        <ul>
+            <li>Maksymalny rozmiar przesyłanego pliku: 10 MB</li>
+            <li>Akceptowane formaty: XML, XAdES</li>
+            <li>Obsługiwane typy jednostek: Mikro, Małe, Inne (zgodnie ze standardami MF)</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>7. Odpowiedzialność</h2>
+        <p>
+            <strong>Serwis jest dostarczany "tak jak jest" (as is).</strong> Administrator dokłada starań,
+            aby Serwis działał poprawnie, jednak nie gwarantuje:
+        </p>
+        <ul>
+            <li>Ciągłej i nieprzerwanej dostępności Serwisu</li>
+            <li>Bezbłędności wyników konwersji</li>
+            <li>Przydatności wyników do konkretnych celów</li>
+        </ul>
+        <p>
+            <strong>Użytkownik ponosi pełną odpowiedzialność</strong> za weryfikację poprawności
+            skonwertowanych danych przed ich wykorzystaniem w celach prawnych, podatkowych lub biznesowych.
+        </p>
+        <p>
+            Administrator nie ponosi odpowiedzialności za szkody wynikłe z:
+        </p>
+        <ul>
+            <li>Błędów w konwersji danych</li>
+            <li>Przerw w dostępności Serwisu</li>
+            <li>Utraty danych</li>
+            <li>Działania osób trzecich</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>8. Prawa własności intelektualnej</h2>
+        <p>
+            Serwis, jego struktura, kod źródłowy i elementy graficzne stanowią własność Administratora
+            i są chronione prawem autorskim.
+        </p>
+        <p>
+            Użytkownik zachowuje pełne prawa do przesłanych przez siebie dokumentów oraz
+            skonwertowanych plików wyjściowych.
+        </p>
+    </section>
+
+    <section>
+        <h2>9. Prywatność</h2>
+        <p>
+            Zasady przetwarzania danych osobowych określa
+            <a href="/polityka-prywatnosci">Polityka prywatności</a>.
+        </p>
+    </section>
+
+    <section>
+        <h2>10. Zmiany regulaminu</h2>
+        <p>
+            Administrator zastrzega sobie prawo do zmiany niniejszego regulaminu.
+            Zmiany wchodzą w życie z chwilą ich opublikowania na stronie Serwisu.
+        </p>
+        <p>
+            Korzystanie z Serwisu po wprowadzeniu zmian oznacza akceptację nowego regulaminu.
+        </p>
+    </section>
+
+    <section>
+        <h2>11. Postanowienia końcowe</h2>
+        <p>
+            W sprawach nieuregulowanych niniejszym regulaminem zastosowanie mają przepisy
+            prawa polskiego, w szczególności Kodeksu cywilnego oraz ustawy o świadczeniu
+            usług drogą elektroniczną.
+        </p>
+        <p>
+            Ewentualne spory będą rozstrzygane przez sądy właściwe dla siedziby Administratora.
+        </p>
+    </section>
+
+    <section>
+        <h2>12. Kontakt</h2>
+        <p>
+            W przypadku pytań dotyczących regulaminu lub funkcjonowania Serwisu,
+            prosimy o kontakt: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+        </p>
+    </section>
+
+    <footer>
+        <a href="/" class="btn-back">&larr; Powrót do strony głównej</a>
+    </footer>
+</article>
+
+<style>
+    .legal-page {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .legal-page header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .legal-page h1 {
+        margin-bottom: 0.5rem;
+    }
+
+    .last-updated {
+        color: var(--pico-muted-color);
+        font-size: 0.9rem;
+    }
+
+    .legal-page section {
+        margin-bottom: 2rem;
+    }
+
+    .legal-page h2 {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        color: var(--theme-primary, var(--pico-primary));
+    }
+
+    .legal-page ul {
+        margin-left: 1.5rem;
+    }
+
+    .legal-page li {
+        margin-bottom: 0.5rem;
+    }
+
+    .legal-page footer {
+        text-align: center;
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--pico-muted-border-color);
+    }
+
+    .btn-back {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: var(--theme-primary, var(--pico-primary));
+        color: white;
+        text-decoration: none;
+        border-radius: var(--pico-border-radius);
+    }
+
+    .btn-back:hover {
+        background: var(--theme-primary-dark, var(--pico-primary-hover));
+        color: white;
+    }
+</style>
+{% endblock %}

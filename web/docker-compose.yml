@@ -1,4 +1,4 @@
-# Docker Compose dla Konwertera SF
+# Docker Compose dla Czytnika SF
 # Przeznaczony do uruchomienia na Synology NAS
 
 version: '3.8'
@@ -8,7 +8,7 @@ services:
     build:
       context: ..
       dockerfile: web/Dockerfile
-    container_name: konwerter-sf
+    container_name: czytnik-sf
     restart: unless-stopped
 
     # Porty
@@ -20,8 +20,10 @@ services:
       - DEBUG=false
       - SECRET_KEY=${SECRET_KEY:-zmien-to-na-produkcji-openssl-rand-hex-32}
       - DATABASE_URL=sqlite+aiosqlite:///./data/app.db
-      - MAX_CONVERSIONS_PER_DAY=10
       - MAX_UPLOAD_SIZE_MB=10
+      - ADMIN_FILE_RETENTION_DAYS=30
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-}
+      - CONTACT_EMAIL=${CONTACT_EMAIL:-kontakt@analizy.io}
 
     # Wolumeny (dane persistentne)
     volumes:

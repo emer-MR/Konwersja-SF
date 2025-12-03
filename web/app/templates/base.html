@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0d9488">
-    <title>{% block title %}Konwerter SF{% endblock %}</title>
+    <meta name="description" content="Czytnik SF - bezpłatne narzędzie do konwersji e-Sprawozdań finansowych XML na Excel">
+    <title>{% block title %}Czytnik SF{% endblock %}</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/favicon.ico">
 
     <!-- Pico CSS - minimalistyczny framework -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
@@ -16,16 +21,14 @@
     <!-- HTMX - dynamika bez JS -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
-    <!-- Google reCAPTCHA v2 -->
     {% block head_extra %}{% endblock %}
 
     <style>
-        /* Inline overrides for Pico compatibility */
         :root {
             --pico-font-size: 16px;
         }
 
-        /* Legacy styles kept for backward compatibility */
+        /* Upload area */
         .upload-area {
             border: 2px dashed var(--theme-border, var(--pico-muted-border-color));
             border-radius: var(--border-radius-xl, var(--pico-border-radius));
@@ -48,23 +51,12 @@
             transform: scale(1.02);
         }
 
-        .history-table {
-            font-size: 0.875rem;
-        }
-
-        .history-table td {
-            vertical-align: middle;
-        }
-
         /* HTMX loading indicator */
         .htmx-indicator {
             display: none;
         }
 
-        .htmx-request .htmx-indicator {
-            display: inline-block;
-        }
-
+        .htmx-request .htmx-indicator,
         .htmx-request.htmx-indicator {
             display: inline-block;
         }
@@ -85,21 +77,46 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Tags */
-        .tag {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background-color: var(--theme-secondary, #495057);
-            color: var(--theme-text-inverse, #fff);
-            border-radius: var(--border-radius-full, 1rem);
-            font-size: 0.8rem;
-            text-decoration: none;
-            transition: background-color 0.2s;
+        /* Cookie consent banner */
+        .cookie-consent {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--pico-card-background-color);
+            border-top: 1px solid var(--pico-muted-border-color);
+            padding: 1rem;
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
         }
 
-        .tag:hover {
-            background-color: var(--theme-secondary-dark, #343a40);
-            color: var(--theme-text-inverse, #fff);
+        .cookie-consent.hidden {
+            display: none;
+        }
+
+        .cookie-consent-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .cookie-consent-text {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        .cookie-consent-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .cookie-consent-buttons button {
+            margin: 0;
+            padding: 0.5rem 1rem;
         }
     </style>
 </head>
@@ -109,54 +126,92 @@
             <nav>
                 <a href="/" class="logo">
                     <span class="logo-icon">A</span>
-                    analizy.io
+                    czytnik.analizy.io
                 </a>
                 <div class="nav-menu">
                     <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Strona główna</a>
-                    <a href="/blog" {% if '/blog' in request.path %}class="active"{% endif %}>Wiadomości</a>
-                    <a href="/convert" {% if '/convert' in request.path %}class="active"{% endif %}>Konwerter</a>
-                    {% if menu_pages %}
-                        {% for page in menu_pages %}
-                            {% if page.slug != 'home' %}
-                            <a href="/strona/{{ page.slug }}" {% if request.path == '/strona/' + page.slug %}class="active"{% endif %}>{{ page.title }}</a>
-                            {% endif %}
-                        {% endfor %}
-                    {% endif %}
                 </div>
                 <div class="nav-links">
                     <div class="theme-switcher" id="theme-switcher"></div>
-                    {% if user %}
-                        <span class="text-muted">{{ user.email }}</span>
-                        {% if user.is_admin %}
-                        <a href="/admin" role="button" class="outline btn-sm">Admin</a>
-                        {% endif %}
-                        <a href="/logout" role="button" class="secondary btn-sm">Wyloguj</a>
-                    {% else %}
-                        <a href="/login" class="btn-ghost">Zaloguj</a>
-                        <a href="/register" role="button" class="btn-sm">Zarejestruj</a>
-                    {% endif %}
                 </div>
             </nav>
         </div>
     </header>
 
     <main class="container">
-        {% if message %}
-        <div class="alert alert-{{ message_category|default('info') }}">
-            {{ message }}
-        </div>
-        {% endif %}
-
         {% block content %}{% endblock %}
     </main>
 
     <footer class="main-footer">
         <div class="container">
+            <div class="footer-links">
+                <a href="/polityka-prywatnosci">Polityka prywatności</a>
+                <span>&middot;</span>
+                <a href="/regulamin">Regulamin</a>
+            </div>
             <p>&copy; 2025 analizy.io &middot; Narzędzia dla profesjonalistów</p>
         </div>
     </footer>
 
+    <!-- Cookie Consent Banner -->
+    <div class="cookie-consent" id="cookie-consent">
+        <div class="cookie-consent-content">
+            <div class="cookie-consent-text">
+                Ta strona używa plików cookie oraz Google Analytics do analizy ruchu.
+                Korzystając ze strony, wyrażasz zgodę na ich użycie.
+                <a href="/polityka-prywatnosci">Dowiedz się więcej</a>
+            </div>
+            <div class="cookie-consent-buttons">
+                <button class="secondary" onclick="declineCookies()">Odmów</button>
+                <button onclick="acceptCookies()">Akceptuję</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Theme Switcher JS -->
     <script src="/static/js/theme-switcher.js"></script>
+
+    <!-- Cookie Consent & Google Analytics -->
+    <script>
+        // Sprawdź czy użytkownik już wyraził zgodę
+        function checkCookieConsent() {
+            const consent = localStorage.getItem('cookie-consent');
+            if (consent === 'accepted') {
+                document.getElementById('cookie-consent').classList.add('hidden');
+                loadGoogleAnalytics();
+            } else if (consent === 'declined') {
+                document.getElementById('cookie-consent').classList.add('hidden');
+            }
+        }
+
+        function acceptCookies() {
+            localStorage.setItem('cookie-consent', 'accepted');
+            document.getElementById('cookie-consent').classList.add('hidden');
+            loadGoogleAnalytics();
+        }
+
+        function declineCookies() {
+            localStorage.setItem('cookie-consent', 'declined');
+            document.getElementById('cookie-consent').classList.add('hidden');
+        }
+
+        function loadGoogleAnalytics() {
+            {% if ga_measurement_id %}
+            // Google Analytics
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}';
+            document.head.appendChild(script);
+
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '{{ ga_measurement_id }}');
+            {% endif %}
+        }
+
+        // Sprawdź zgodę przy ładowaniu strony
+        checkCookieConsent();
+    </script>
 </body>
 </html>

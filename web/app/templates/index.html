@@ -1,42 +1,74 @@
 {% extends "base.html" %}
 
-{% block title %}Konwerter SF - Strona główna{% endblock %}
+{% block title %}Czytnik SF - Konwersja sprawozdań finansowych XML na Excel{% endblock %}
+
+{% block head_extra %}
+{% if recaptcha_enabled %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
+{% endblock %}
 
 {% block content %}
-{% if home_page %}
-<!-- Treść ze strony statycznej "home" -->
-<div class="page-content">
-    {{ home_page.content | safe }}
-</div>
-{% else %}
-<!-- Domyślna zawartość z nowym designem -->
-
 <!-- Hero Section -->
 <section class="hero">
-    <div class="hero-badge">
-        <span class="dot"></span>
-        Bezpłatnie do {{ max_conversions or 10 }} konwersji dziennie
-    </div>
-
-    <h1>Konwerter <span>Sprawozdań</span><br>Finansowych</h1>
-
-    <p>Przekształć e-Sprawozdanie XML na czytelny plik Excel w kilka sekund. Bez instalacji, bez komplikacji.</p>
-
-    <div class="hero-buttons">
-        {% if user %}
-        <a href="/convert" role="button" class="btn-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Prześlij plik XML
-        </a>
-        {% else %}
-        <a href="/register" role="button" class="btn-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Prześlij plik XML
-        </a>
-        {% endif %}
-        <a href="/blog" role="button" class="outline btn-lg">Zobacz demo</a>
-    </div>
+    <h1>Czytnik <span>Sprawozdań</span><br>Finansowych</h1>
+    <p>Przekształć e-Sprawozdanie XML na czytelny plik Excel w kilka sekund. Bezpłatnie, bez rejestracji.</p>
 </section>
+
+<!-- Converter Section -->
+<article id="converter">
+    <header>
+        <h2>Odczytaj sprawozdanie i zamień je w plik xlsx</h2>
+        <p>Prześlij plik XML (e-Sprawozdanie) aby otrzymać plik Excel z Bilansem, RZiS i innymi elementami.</p>
+    </header>
+
+    <!-- Formularz uploadu -->
+    <form
+        id="upload-form"
+        hx-post="/htmx/convert"
+        hx-encoding="multipart/form-data"
+        hx-target="#result"
+        hx-swap="innerHTML"
+        hx-indicator="#upload-indicator"
+    >
+        <div class="upload-area" id="drop-zone">
+            <div class="upload-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </div>
+            <p class="upload-title">Przeciągnij plik XML tutaj</p>
+            <p class="upload-subtitle">lub kliknij aby wybrać plik</p>
+            <input
+                type="file"
+                id="file"
+                name="file"
+                accept=".xml,.xades"
+                required
+            >
+            <p id="selected-file" class="selected-file"></p>
+            <p class="upload-hint">Akceptowane formaty: XML, XAdES (max 10 MB)</p>
+        </div>
+
+        {% if recaptcha_enabled %}
+        <div class="recaptcha-container">
+            <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+        </div>
+        {% endif %}
+
+        <button type="submit" id="submit-btn" class="convert-btn">
+            <span id="upload-indicator" class="htmx-indicator">
+                <span class="spinner"></span>
+            </span>
+            <span class="btn-text">Konwertuj do Excel</span>
+        </button>
+    </form>
+
+    <!-- Wynik konwersji -->
+    <div id="result"></div>
+</article>
 
 <!-- Features Section -->
 <section class="features-grid">
@@ -52,8 +84,8 @@
         <div class="feature-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         </div>
-        <h3>Wszystkie typy jednostek</h3>
-        <p>Obsługa sprawozdań Mikro, Małych i Innych jednostek zgodnie ze standardami</p>
+        <h3>Najważniejsze typy jednostek</h3>
+        <p>Obsługa sprawozdań Mikro, Małych i Innych jednostek zgodnie ze schematami ze strony <a href="https://www.gov.pl/web/kas/struktury-e-sprawozdan" target="_blank" rel="noopener">Ministerstwa Finansów</a></p>
     </div>
 
     <div class="feature-card">
@@ -65,21 +97,20 @@
     </div>
 </section>
 
-<!-- Steps Section -->
+<!-- How it works -->
 <section class="steps-section">
     <h2>Jak to działa?</h2>
-
     <div class="steps-grid">
         <div class="step">
             <div class="step-number">1</div>
-            <h4>Zarejestruj się</h4>
-            <p>Szybka rejestracja lub logowanie</p>
+            <h4>Prześlij XML</h4>
+            <p>Wybierz plik e-Sprawozdania</p>
         </div>
 
         <div class="step">
             <div class="step-number">2</div>
-            <h4>Prześlij XML</h4>
-            <p>Wybierz plik e-Sprawozdania</p>
+            <h4>Potwierdź CAPTCHA</h4>
+            <p>Weryfikacja antyspamowa</p>
         </div>
 
         <div class="step">
@@ -90,5 +121,323 @@
     </div>
 </section>
 
-{% endif %}
+<!-- Contact Section -->
+<section class="contact-section" id="kontakt">
+    <h2>Kontakt</h2>
+    <div class="contact-info">
+        <div class="contact-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+        </div>
+        {% if contact_address %}
+        <div class="contact-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>{{ contact_address }}</span>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<style>
+    /* Hero */
+    .hero {
+        text-align: center;
+        padding: 3rem 0;
+    }
+
+    .hero h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .hero h1 span {
+        color: var(--theme-primary, var(--pico-primary));
+    }
+
+    .hero p {
+        font-size: 1.1rem;
+        color: var(--pico-muted-color);
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* Upload */
+    .upload-area {
+        border: 3px dashed var(--pico-muted-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 3rem 2rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background-color: var(--pico-card-background-color);
+    }
+
+    .upload-area:hover {
+        border-color: var(--pico-primary);
+        background-color: var(--pico-card-sectioning-background-color);
+    }
+
+    .upload-area.dragover {
+        border-color: var(--pico-primary);
+        background-color: var(--pico-primary-focus);
+        border-style: solid;
+    }
+
+    .upload-icon {
+        color: var(--pico-muted-color);
+        margin-bottom: 1rem;
+    }
+
+    .upload-area:hover .upload-icon {
+        color: var(--pico-primary);
+    }
+
+    .upload-title {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .upload-subtitle {
+        color: var(--pico-muted-color);
+        margin-bottom: 1rem;
+    }
+
+    .upload-area input[type="file"] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        border: 0;
+    }
+
+    .selected-file {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background-color: var(--pico-primary-focus);
+        border-radius: var(--pico-border-radius);
+        font-weight: bold;
+        color: var(--pico-primary);
+        display: none;
+    }
+
+    .selected-file.show {
+        display: block;
+    }
+
+    .upload-hint {
+        font-size: 0.875rem;
+        color: var(--pico-muted-color);
+        margin-top: 1rem;
+        margin-bottom: 0;
+    }
+
+    .convert-btn {
+        width: 100%;
+        font-size: 1.1rem;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .recaptcha-container {
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: center;
+    }
+
+    /* Features */
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 3rem 0;
+    }
+
+    .feature-card {
+        background: var(--pico-card-background-color);
+        padding: 1.5rem;
+        border-radius: var(--pico-border-radius);
+        text-align: center;
+    }
+
+    .feature-icon {
+        color: var(--theme-primary, var(--pico-primary));
+        margin-bottom: 1rem;
+    }
+
+    .feature-card h3 {
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .feature-card p {
+        color: var(--pico-muted-color);
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    /* Steps */
+    .steps-section {
+        text-align: center;
+        margin: 3rem 0;
+    }
+
+    .steps-section h2 {
+        margin-bottom: 2rem;
+    }
+
+    .steps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 2rem;
+    }
+
+    .step {
+        text-align: center;
+    }
+
+    .step-number {
+        width: 3rem;
+        height: 3rem;
+        background: var(--theme-primary, var(--pico-primary));
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin: 0 auto 1rem;
+    }
+
+    .step h4 {
+        margin-bottom: 0.5rem;
+    }
+
+    .step p {
+        color: var(--pico-muted-color);
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    /* Contact */
+    .contact-section {
+        text-align: center;
+        margin: 3rem 0;
+        padding: 2rem;
+        background: var(--pico-card-background-color);
+        border-radius: var(--pico-border-radius);
+    }
+
+    .contact-section h2 {
+        margin-bottom: 1.5rem;
+    }
+
+    .contact-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--pico-color);
+    }
+
+    .contact-item svg {
+        color: var(--theme-primary, var(--pico-primary));
+    }
+
+    .contact-item a {
+        color: var(--pico-color);
+    }
+
+    /* Footer links */
+    .footer-links {
+        margin-bottom: 0.5rem;
+    }
+
+    .footer-links a {
+        color: var(--pico-muted-color);
+        text-decoration: none;
+    }
+
+    .footer-links a:hover {
+        color: var(--pico-color);
+    }
+
+    @media (max-width: 768px) {
+        .hero h1 {
+            font-size: 1.75rem;
+        }
+    }
+</style>
+
+<script>
+    // Drag & drop
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file');
+    const selectedFileDisplay = document.getElementById('selected-file');
+
+    // Klik na strefę = klik na input
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // Pokaż nazwę wybranego pliku
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            selectedFileDisplay.textContent = fileInput.files[0].name;
+            selectedFileDisplay.classList.add('show');
+        } else {
+            selectedFileDisplay.classList.remove('show');
+        }
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            selectedFileDisplay.textContent = files[0].name;
+            selectedFileDisplay.classList.add('show');
+        }
+    });
+
+    // Po udanej konwersji
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/htmx/convert' && evt.detail.successful) {
+            // Wyczyść wybór pliku
+            fileInput.value = '';
+            selectedFileDisplay.classList.remove('show');
+            // Reset reCAPTCHA jeśli istnieje
+            if (typeof grecaptcha !== 'undefined') {
+                grecaptcha.reset();
+            }
+        }
+    });
+</script>
 {% endblock %}

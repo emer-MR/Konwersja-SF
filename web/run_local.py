@@ -13,13 +13,13 @@ import uvicorn
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("Konwerter SF - serwer deweloperski")
+    print("Czytnik SF - serwer deweloperski")
     print("=" * 50)
-    print("Aplikacja będzie dostępna pod adresem:")
+    print("Aplikacja:")
     print("  http://localhost:8000")
     print("")
-    print("Dokumentacja API (Swagger):")
-    print("  http://localhost:8000/docs")
+    print("Panel admina:")
+    print("  http://localhost:8000/admin/login")
     print("")
     print("Naciśnij Ctrl+C aby zatrzymać serwer")
     print("=" * 50)

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Panel administracyjny - Logowanie{% endblock %}
+
+{% block content %}
+<article class="admin-login">
+    <header>
+        <h1>Panel administracyjny</h1>
+        <p>Zaloguj się aby uzyskać dostęp</p>
+    </header>
+
+    {% if error %}
+    <div class="alert alert-error">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/admin/login">
+        <label for="email">
+            Email
+            <input type="email" id="email" name="email" required autofocus>
+        </label>
+
+        <label for="password">
+            Hasło
+            <input type="password" id="password" name="password" required>
+        </label>
+
+        <button type="submit">Zaloguj</button>
+    </form>
+
+    <footer>
+        <a href="/">&larr; Powrót do strony głównej</a>
+    </footer>
+</article>
+
+<style>
+    .admin-login {
+        max-width: 400px;
+        margin: 3rem auto;
+    }
+
+    .admin-login header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .admin-login h1 {
+        margin-bottom: 0.5rem;
+    }
+
+    .admin-login header p {
+        color: var(--pico-muted-color);
+    }
+
+    .alert-error {
+        background-color: #fee2e2;
+        border: 1px solid #ef4444;
+        color: #dc2626;
+        padding: 1rem;
+        border-radius: var(--pico-border-radius);
+        margin-bottom: 1rem;
+    }
+
+    .admin-login footer {
+        text-align: center;
+        margin-top: 2rem;
+    }
+</style>
+{% endblock %}
