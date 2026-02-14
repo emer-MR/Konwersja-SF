@@ -65,6 +65,13 @@ async def lifespan(app: FastAPI):
     settings.ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
     settings.ADMIN_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Wyczyść osierocone pliki tymczasowe z poprzedniego uruchomienia
+    for f in settings.OUTPUT_DIR.glob("*.xlsx"):
+        try:
+            f.unlink()
+        except Exception:
+            pass
+
     # Inicjalizuj bazę danych
     await init_db()
 
