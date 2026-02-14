@@ -58,10 +58,11 @@ web/
 │   │   ├── admin/
 │   │   │   ├── login.html   # Logowanie admina
 │   │   │   └── dashboard.html # Panel admina
+│   │   ├── download_expired.html # Strona wygaśnięcia linku
 │   │   └── partials/
 │   │       └── conversion_result.html # Wynik konwersji (HTMX)
 │   └── static/
-│       └── favicon.ico
+│       └── favicon.ico      # Teal z białą literą A
 ├── docker-compose.yml           # Dla Synology NAS
 ├── docker-compose.hostinger.yml # Dla Hostinger VPS (z Traefik)
 ├── Dockerfile.prod              # Dockerfile produkcyjny
@@ -95,7 +96,7 @@ Strona wzorowana na kalkulator.analizy.io (PPS Maker). Wspólne elementy:
 | GET | `/polityka-prywatnosci` | Redirect do / (treść w modalu) |
 | GET | `/regulamin` | Redirect do / (treść w modalu) |
 | POST | `/htmx/convert` | Konwersja pliku (HTMX) |
-| GET | `/download/{session_id}` | Pobranie pliku (tymczasowy link, 5 min) |
+| GET | `/download/{session_id}` | Pobranie pliku (5 min) lub strona wygaśnięcia |
 
 ### Administracyjne
 | Metoda | Ścieżka | Opis |
@@ -137,7 +138,8 @@ CONTACT_EMAIL=kontakt@analizy.io        # Email kontaktowy
 5. Konwersja XML → XLSX z disclaimerem
 6. Wyodrębnienie załączników (jeśli są)
 7. Generowanie tymczasowego linku (5 min)
-8. Wyświetlenie wyniku z podglądem i linkiem do pobrania
+8. Wyświetlenie wyniku z podglądem i kartami pobierania (XLSX + załączniki)
+9. Po wygaśnięciu linku (5 min) — ładna strona z przyciskiem "Konwertuj ponownie"
 
 ## Generowane pliki XLSX
 
@@ -158,7 +160,7 @@ Każdy arkusz zawiera w wierszu 1 kursywny tekst:
 - Bazowy obraz: `python:3.11-slim`
 - Zależności systemowe: gcc, libxml2-dev, libxslt1-dev (dla lxml)
 - Użytkownik non-root: `appuser` (bezpieczeństwo)
-- Port: 8000, Workers: 2 (uvicorn)
+- Port: 8000, Workers: 1 (uvicorn — 1 worker, bo temp_files jest in-memory dict)
 - Healthcheck: sprawdza `/docs`
 
 ### docker-compose.hostinger.yml (Traefik)
@@ -228,7 +230,7 @@ docker exec -it czytnik-sf python create_admin.py --list
 
 | Wersja | Data | Zmiany |
 |--------|------|--------|
-| 3.0.0 | luty 2026 | Modernizacja UI (wzór: PPS Maker), modale, baner bezpieczeństwa, cookie consent, disclaimer w XLSX, wyłączenie gromadzenia danych, domena czytnik.analizy.io |
+| 3.0.0 | luty 2026 | Modernizacja UI (wzór: PPS Maker), modale, baner bezpieczeństwa, cookie consent, disclaimer w XLSX, wyłączenie gromadzenia danych, domena czytnik.analizy.io, karty pobierania, strona wygaśnięcia linku, favicon teal, 1 worker |
 | 2.0.0 | grudzień 2025 | Uproszczenie: usunięcie rejestracji, publiczny dostęp z reCAPTCHA |
 | 1.0.0 | listopad 2025 | Pierwsza wersja z rejestracją i logowaniem |
 
