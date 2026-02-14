@@ -11,8 +11,8 @@
 ## Struktura katalogów na serwerze
 
 ```
-/docker/
-└── konwersja-sf/          # Katalog projektu (git clone)
+/root/
+└── Konwersja-SF/          # git clone (repo GitHub)
     ├── web/
     │   ├── docker-compose.hostinger.yml   # UŻYWANY PLIK COMPOSE
     │   ├── Dockerfile.prod
@@ -23,7 +23,7 @@
 
 ## Konfiguracja .env
 
-Plik `.env` w katalogu `/docker/konwersja-sf/web/`:
+Plik `.env` w katalogu `/root/Konwersja-SF/web/`:
 
 ```env
 # WYMAGANE
@@ -83,7 +83,7 @@ docker logs czytnik-sf
 ssh root@72.62.1.15
 
 # 2. Przejdź do katalogu
-cd /docker/konwersja-sf
+cd /root/Konwersja-SF
 
 # 3. Pobierz zmiany
 git pull origin main
@@ -102,7 +102,7 @@ Użyj gdy zmieniła się struktura bazy:
 
 ```bash
 ssh root@72.62.1.15
-cd /docker/konwersja-sf
+cd /root/Konwersja-SF
 
 git pull origin main
 

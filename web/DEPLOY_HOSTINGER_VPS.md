@@ -121,10 +121,9 @@ ssh root@TWOJE_IP_VPS
 ### Krok 2: Utwórz katalog i pobierz projekt
 
 ```bash
-mkdir -p ~/konwerter-sf
-cd ~/konwerter-sf
-git clone https://github.com/emer-MR/Konwersja-SF.git .
-cd web
+cd ~
+git clone https://github.com/emer-MR/Konwersja-SF.git
+cd ~/Konwersja-SF/web
 ```
 
 ### Krok 3: Utwórz plik .env
@@ -188,7 +187,7 @@ nano /etc/nginx/sites-available/czytnik.analizy.io.conf
 
 **Opcja C: Przez git (jeśli sklonowałeś repo)**
 ```bash
-cp ~/konwerter-sf/web/nginx/czytnik.analizy.io.conf /etc/nginx/sites-available/
+cp ~/Konwersja-SF/web/nginx/czytnik.analizy.io.conf /etc/nginx/sites-available/
 ```
 
 ### Krok 3: Aktywacja konfiguracji
@@ -245,7 +244,7 @@ W tym przypadku pomiń kroki z certbot.
 
 ```bash
 # Wejdź do kontenera
-docker exec -it konwerter-sf bash
+docker exec -it czytnik-sf bash
 
 # Utwórz admina
 cd /app
@@ -258,7 +257,7 @@ exit
 ### Przez Docker Manager
 
 W panelu Hostinger Docker Manager:
-1. Znajdź projekt "konwerter-sf"
+1. Znajdź projekt "czytnik-sf"
 2. Kliknij na kontener
 3. Użyj funkcji "Terminal" lub "Exec"
 4. Wykonaj: `python create_admin.py admin@analizy.io TwojeHaslo123`
@@ -270,7 +269,7 @@ W panelu Hostinger Docker Manager:
 ### Komendy Docker (przez SSH)
 
 ```bash
-cd ~/konwerter-sf/web
+cd ~/Konwersja-SF/web
 
 # Status
 docker compose -f docker-compose.hostinger.yml ps
@@ -301,12 +300,12 @@ docker compose -f docker-compose.hostinger.yml up -d
 
 ```bash
 # Ręczny backup
-docker cp konwerter-sf:/app/data/app.db ~/backup_$(date +%Y%m%d).db
+docker cp czytnik-sf:/app/data/app.db ~/backup_$(date +%Y%m%d).db
 
 # Automatyczny (cron)
 crontab -e
 # Dodaj:
-0 3 * * * docker cp konwerter-sf:/app/data/app.db ~/backups/app_$(date +\%Y\%m\%d).db
+0 3 * * * docker cp czytnik-sf:/app/data/app.db ~/backups/app_$(date +\%Y\%m\%d).db
 ```
 
 ---
