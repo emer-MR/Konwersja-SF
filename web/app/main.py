@@ -332,22 +332,33 @@ async def htmx_convert(
 
 
 @app.get("/download/{session_id}")
-async def download_file(session_id: str):
+async def download_file(request: Request, session_id: str):
     """Pobieranie pliku XLSX (tymczasowy link)."""
+    error_msg = None
+
     if session_id not in temp_files:
-        raise HTTPException(status_code=404, detail="Plik nie istnieje lub wygasł")
+        error_msg = "Link do pobrania wygasł lub nie istnieje"
+    else:
+        file_info = temp_files[session_id]
+        if file_info["expires_at"] < datetime.now():
+            del temp_files[session_id]
+            error_msg = "Link do pobrania wygasł (pliki są dostępne przez 5 minut)"
+        else:
+            file_path = Path(file_info["path"])
+            if not file_path.exists():
+                del temp_files[session_id]
+                error_msg = "Plik został już usunięty z serwera"
 
-    file_info = temp_files[session_id]
-
-    # Sprawdź czy nie wygasł
-    if file_info["expires_at"] < datetime.now():
-        del temp_files[session_id]
-        raise HTTPException(status_code=404, detail="Link do pobrania wygasł")
-
-    file_path = Path(file_info["path"])
-    if not file_path.exists():
-        del temp_files[session_id]
-        raise HTTPException(status_code=404, detail="Plik nie istnieje")
+    if error_msg:
+        return templates.TemplateResponse(
+            "download_expired.html",
+            {
+                "request": request,
+                "error_message": error_msg,
+                "ga_measurement_id": settings.GA_MEASUREMENT_ID,
+            },
+            status_code=404,
+        )
 
     return FileResponse(
         path=file_path,
