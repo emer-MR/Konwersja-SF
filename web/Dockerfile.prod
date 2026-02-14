@@ -8,7 +8,7 @@ FROM python:3.11-slim
 
 LABEL maintainer="Konwerter SF"
 LABEL description="Konwerter Sprawozdań Finansowych XML → XLSX"
-LABEL version="1.0"
+LABEL version="3.0"
 
 # Zmienne środowiskowe
 ENV PYTHONDONTWRITEBYTECODE=1

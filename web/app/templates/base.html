@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl" data-theme="teal">
+<html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,207 +11,705 @@
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="apple-touch-icon" href="/static/favicon.ico">
 
-    <!-- Pico CSS - minimalistyczny framework -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-
-    <!-- Custom Themes & Styles -->
-    <link rel="stylesheet" href="/static/css/themes.css">
-    <link rel="stylesheet" href="/static/css/styles.css">
-
-    <!-- HTMX - dynamika bez JS -->
+    <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     {% block head_extra %}{% endblock %}
 
     <style>
-        :root {
-            --pico-font-size: 16px;
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px 80px 20px;
+            background: #f1f5f9;
+            color: #1e293b;
         }
 
-        /* Upload area */
-        .upload-area {
-            border: 2px dashed var(--theme-border, var(--pico-muted-border-color));
-            border-radius: var(--border-radius-xl, var(--pico-border-radius));
-            padding: 3rem 2rem;
-            text-align: center;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-            background: var(--theme-bg-secondary);
+        /* ===== HEADER ===== */
+        .app-header {
+            background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+            color: white;
+            padding: 24px 28px;
+            margin: 0 -20px 24px -20px;
+            border-radius: 0 0 16px 16px;
+        }
+        .app-header h1 {
+            margin: 0 0 4px 0;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .app-header .subtitle {
+            font-size: 13px;
+            opacity: 0.85;
+        }
+
+        /* ===== SECURITY BANNER ===== */
+        .security-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-left: 4px solid #22c55e;
+            border-radius: 12px;
+            padding: 18px 22px;
+            margin-bottom: 16px;
+            font-size: 15px;
+            color: #15803d;
+            line-height: 1.6;
+        }
+        .security-banner-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        .security-banner-main {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .security-banner-icon {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #22c55e;
+        }
+        .security-banner-disclaimer {
+            font-size: 15px;
+            color: #64748b;
+            line-height: 1.6;
+            padding-left: 36px;
+        }
+        .security-banner-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #86efac;
             cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .security-banner-close:hover {
+            color: #15803d;
+        }
+        .security-banner.hidden {
+            display: none !important;
         }
 
-        .upload-area:hover {
-            border-color: var(--theme-primary, var(--pico-primary));
-            background: var(--theme-bg-tertiary);
+        /* ===== CARDS ===== */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 14px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 600;
+            font-size: 14px;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-header svg {
+            width: 18px;
+            height: 18px;
+            color: #64748b;
+        }
+        .card-body {
+            padding: 20px;
         }
 
-        .upload-area.dragover {
-            border-color: var(--theme-primary, var(--pico-primary));
-            background-color: var(--theme-bg-tertiary, var(--pico-secondary-background));
-            transform: scale(1.02);
+        /* ===== HIDDEN ===== */
+        .hidden {
+            display: none !important;
         }
 
-        /* HTMX loading indicator */
-        .htmx-indicator {
-            display: none;
-        }
-
-        .htmx-request .htmx-indicator,
-        .htmx-request.htmx-indicator {
-            display: inline-block;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 1rem;
-            height: 1rem;
-            border: 2px solid var(--theme-border, #f3f3f3);
-            border-top: 2px solid var(--theme-primary, var(--pico-primary));
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 0.5rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Cookie consent banner */
+        /* ===== COOKIE CONSENT ===== */
         .cookie-consent {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: var(--pico-card-background-color);
-            border-top: 1px solid var(--pico-muted-border-color);
-            padding: 1rem;
-            z-index: 1000;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        }
-
-        .cookie-consent.hidden {
-            display: none;
-        }
-
-        .cookie-consent-content {
-            max-width: 1200px;
-            margin: 0 auto;
+            background: #1e293b;
+            color: white;
+            padding: 16px 24px;
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            gap: 1rem;
+            align-items: center;
+            gap: 20px;
+            z-index: 1000;
             flex-wrap: wrap;
         }
-
-        .cookie-consent-text {
+        .cookie-consent p {
+            margin: 0;
+            font-size: 13px;
             flex: 1;
-            font-size: 0.9rem;
+            line-height: 1.5;
         }
-
+        .cookie-consent a {
+            color: #60a5fa;
+        }
         .cookie-consent-buttons {
             display: flex;
-            gap: 0.5rem;
+            gap: 10px;
+        }
+        .cookie-consent button {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .cookie-consent .btn-accept {
+            background: #3b82f6;
+            color: white;
+        }
+        .cookie-consent .btn-accept:hover {
+            background: #2563eb;
+        }
+        .cookie-consent .btn-necessary {
+            background: #475569;
+            color: white;
+        }
+        .cookie-consent .btn-necessary:hover {
+            background: #334155;
         }
 
-        .cookie-consent-buttons button {
-            margin: 0;
-            padding: 0.5rem 1rem;
+        /* ===== FOOTER ===== */
+        footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            font-size: 12px;
+            z-index: 100;
         }
+        footer a {
+            color: #64748b;
+            text-decoration: none;
+        }
+        footer a:hover {
+            color: #0d9488;
+        }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(2px);
+        }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            width: 90%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 16px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #94a3b8;
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: #1e293b;
+        }
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .modal-body h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #1e293b;
+            font-size: 15px;
+        }
+        .modal-body h3:first-child {
+            margin-top: 0;
+        }
+        .modal-body h4 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            color: #334155;
+            font-size: 14px;
+        }
+        .modal-body p, .modal-body ul {
+            margin-bottom: 15px;
+            color: #475569;
+            font-size: 14px;
+        }
+        .modal-body ul {
+            padding-left: 20px;
+        }
+
+        /* ===== HTMX ===== */
+        .htmx-indicator {
+            display: none;
+        }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #e2e8f0;
+            border-top: 2px solid #0d9488;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ===== ALERTS ===== */
+        .alert {
+            padding: 14px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #15803d;
+        }
+        .alert-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .app-header h1 {
+                font-size: 18px;
+            }
+            .security-banner {
+                font-size: 13px;
+                padding: 14px 16px;
+            }
+            .security-banner-disclaimer {
+                font-size: 13px;
+                padding-left: 0;
+            }
+        }
+
+        {% block extra_styles %}{% endblock %}
     </style>
 </head>
 <body>
-    <header class="main-header">
-        <div class="container">
-            <nav>
-                <a href="/" class="logo">
-                    <span class="logo-icon">A</span>
-                    czytnik.analizy.io
-                </a>
-                <div class="nav-menu">
-                    <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Strona główna</a>
-                </div>
-                <div class="nav-links">
-                    <div class="theme-switcher" id="theme-switcher"></div>
-                </div>
-            </nav>
-        </div>
+    <!-- HEADER -->
+    <header class="app-header">
+        <h1>Czytnik Sprawozdań Finansowych</h1>
+        <div class="subtitle">Konwersja e-Sprawozdań XML na czytelny plik Excel — bezpłatnie, bez rejestracji</div>
     </header>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="main-footer">
-        <div class="container">
-            <div class="footer-links">
-                <a href="/polityka-prywatnosci">Polityka prywatności</a>
-                <span>&middot;</span>
-                <a href="/regulamin">Regulamin</a>
+    <!-- SECURITY BANNER -->
+    <div id="security-banner" class="security-banner">
+        <div class="security-banner-content">
+            <div class="security-banner-main">
+                <svg class="security-banner-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                <span>Twoje dane są bezpieczne — przesłane pliki są przetwarzane na serwerze wyłącznie w&nbsp;celu konwersji i&nbsp;usuwane natychmiast po jej zakończeniu. Skonwertowane pliki są dostępne do pobrania przez 5&nbsp;minut, po czym zostają automatycznie usunięte.</span>
             </div>
-            <p>&copy; 2025 analizy.io &middot; Narzędzia dla profesjonalistów</p>
+            <div class="security-banner-disclaimer">Narzędzie ma charakter wyłącznie pomocniczy. Wyniki konwersji nie stanowią oficjalnego dokumentu. Przed wykorzystaniem danych w&nbsp;celach prawnych, podatkowych lub biznesowych zweryfikuj poprawność konwersji. Administrator nie ponosi odpowiedzialności za skutki wykorzystania skonwertowanych treści.</div>
         </div>
+        <button class="security-banner-close" onclick="zamknijBanerBezpieczenstwa()" title="Zamknij">&times;</button>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    <footer>
+        <a href="#" onclick="pokazModal('regulamin'); return false;">Regulamin</a>
+        <a href="#" onclick="pokazModal('prywatnosc'); return false;">Polityka prywatności</a>
+        <a href="#" onclick="zmienUstawieniaCookies(); return false;">Ustawienia cookies</a>
     </footer>
 
-    <!-- Cookie Consent Banner -->
-    <div class="cookie-consent" id="cookie-consent">
-        <div class="cookie-consent-content">
-            <div class="cookie-consent-text">
-                Ta strona używa plików cookie oraz Google Analytics do analizy ruchu.
-                Korzystając ze strony, wyrażasz zgodę na ich użycie.
-                <a href="/polityka-prywatnosci">Dowiedz się więcej</a>
+    <!-- Cookie consent banner -->
+    <div id="cookie-consent" class="cookie-consent hidden">
+        <p>
+            Ta strona wykorzystuje pliki cookies w celach funkcjonalnych oraz analitycznych (Google Analytics).
+            Korzystając ze strony, wyrażasz zgodę na ich użycie.
+            <a href="#" onclick="pokazModal('prywatnosc'); return false;">Dowiedz się więcej</a>
+        </p>
+        <div class="cookie-consent-buttons">
+            <button class="btn-accept" onclick="akceptujCookies()">Akceptuję wszystkie</button>
+            <button class="btn-necessary" onclick="akceptujTylkoNiezbedne()">Tylko niezbędne</button>
+        </div>
+    </div>
+
+    <!-- Modal: Regulamin -->
+    <div id="modal-regulamin" class="modal-overlay hidden" onclick="zamknijModal(event, 'regulamin')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Regulamin serwisu</h2>
+                <button class="modal-close" onclick="zamknijModalBtn('regulamin')">&times;</button>
             </div>
-            <div class="cookie-consent-buttons">
-                <button class="secondary" onclick="declineCookies()">Odmów</button>
-                <button onclick="acceptCookies()">Akceptuję</button>
+            <div class="modal-body">
+                <h3>1. Informacje ogólne</h3>
+                <p>
+                    Serwis czytnik.analizy.io umożliwia bezpłatną konwersję elektronicznych sprawozdań finansowych
+                    z formatu XML na format Excel (XLSX). Usługa nie wymaga rejestracji.
+                </p>
+                <p>
+                    Właścicielem i administratorem aplikacji jest:<br>
+                    <strong>Fundacja Modulo</strong><br>
+                    ul. Wigury 30a lok. 11, 90-319 Łódź<br>
+                    KRS: 0001046866 · NIP: 7252333207 · REGON: 525827606<br>
+                    E-mail: <a href="mailto:kontakt@analizy.io">kontakt@analizy.io</a>
+                </p>
+
+                <h3>2. Definicje</h3>
+                <ul>
+                    <li><strong>e-Sprawozdanie</strong> — elektroniczne sprawozdanie finansowe zgodne ze strukturami danych opublikowanymi przez Ministerstwo Finansów, sporządzone w formacie XML</li>
+                    <li><strong>XAdES</strong> — format podpisu elektronicznego XML; plik XML opatrzony kwalifikowanym podpisem elektronicznym</li>
+                    <li><strong>XLSX</strong> — format pliku arkusza kalkulacyjnego Microsoft Excel (Office Open XML)</li>
+                </ul>
+
+                <h3>3. Zakres usług</h3>
+                <p>Serwis oferuje bezpłatną konwersję e-Sprawozdań finansowych.</p>
+
+                <h4>Formaty wejściowe</h4>
+                <ul>
+                    <li>Pliki XML — surowe sprawozdania finansowe</li>
+                    <li>Pliki XAdES — sprawozdania z kwalifikowanym podpisem elektronicznym</li>
+                    <li>Maksymalny rozmiar pliku: 10 MB</li>
+                </ul>
+
+                <h4>Obsługiwane typy jednostek</h4>
+                <ul>
+                    <li><strong>Jednostka Mikro</strong> (JednostkaMikro) — uproszczone sprawozdanie</li>
+                    <li><strong>Jednostka Mała</strong> (JednostkaMala) — sprawozdanie o średniej złożoności</li>
+                    <li><strong>Jednostka Inna</strong> (JednostkaInna) — pełne sprawozdanie dla pozostałych/dużych jednostek</li>
+                </ul>
+
+                <h4>Wersje schematów</h4>
+                <p>Schematy MF w wersjach: <strong>v1-0</strong>, <strong>v1-2</strong>, <strong>v1-3</strong>. Warianty walutowe: PLN (wartości dokładne) i tys. PLN (zaokrąglone).</p>
+
+                <h4>Generowane arkusze XLSX</h4>
+                <ul>
+                    <li><strong>Bilans</strong> — aktywa i pasywa z danymi bieżącymi, porównawczymi i przekształconymi</li>
+                    <li><strong>Rachunek Zysków i Strat</strong> — wariant porównawczy lub kalkulacyjny</li>
+                    <li><strong>Nota podatkowa</strong> — dodatkowe informacje i objaśnienia</li>
+                    <li><strong>Zestawienie zmian w kapitale własnym</strong></li>
+                    <li><strong>Rachunek przepływów pieniężnych</strong> — metoda bezpośrednia lub pośrednia</li>
+                </ul>
+
+                <h4>Załączniki</h4>
+                <p>Serwis automatycznie wyodrębnia pliki osadzone w XML (np. dokumenty PDF) i udostępnia je do osobnego pobrania.</p>
+
+                <h3>4. Zrzeczenie się odpowiedzialności</h3>
+                <p>
+                    <strong>Narzędzie ma charakter wyłącznie pomocniczy.</strong> Wyniki konwersji nie stanowią
+                    oficjalnego dokumentu. Przed wykorzystaniem danych w celach prawnych, podatkowych lub
+                    biznesowych użytkownik zobowiązany jest do zweryfikowania poprawności konwersji.
+                    Administrator nie ponosi odpowiedzialności za skutki wykorzystania skonwertowanych treści.
+                </p>
+
+                <h3>5. Przetwarzane pliki</h3>
+                <p>
+                    <strong>Pliki wejściowe (XML/XAdES):</strong> przetwarzane na serwerze wyłącznie w celu konwersji,
+                    usuwane natychmiast po jej zakończeniu. Przetwarzanie odbywa się w pamięci operacyjnej serwera.
+                </p>
+                <p>
+                    <strong>Pliki wyjściowe (XLSX):</strong> dostępne do pobrania przez maks. 5 minut,
+                    następnie automatycznie usuwane z serwera.
+                </p>
+                <p>
+                    <strong>Metadane:</strong> serwis nie gromadzi ani nie przechowuje żadnych danych
+                    o przeprowadzonych konwersjach (nazw plików, nazw firm, NIP-ów ani dat).
+                    Żadne informacje o treści przesłanych dokumentów nie są zapisywane.
+                </p>
+
+                <h3>6. Ograniczenia techniczne</h3>
+                <ul>
+                    <li>Maks. rozmiar pliku: 10 MB</li>
+                    <li>Formaty wejściowe: XML, XAdES</li>
+                    <li>Typy jednostek: Mikro, Mała, Inna (zgodnie ze schematami MF)</li>
+                    <li>Wersje schematów: v1-0, v1-2, v1-3</li>
+                    <li>Format wyjściowy: XLSX</li>
+                </ul>
+
+                <h3>7. Odpowiedzialność</h3>
+                <p>
+                    <strong>Serwis jest dostarczany "tak jak jest" (as is).</strong> Administrator nie gwarantuje
+                    ciągłej dostępności, bezbłędności wyników ani przydatności do konkretnych celów.
+                    Użytkownik ponosi pełną odpowiedzialność za weryfikację skonwertowanych danych.
+                </p>
+
+                <h3>8. Prawa własności intelektualnej</h3>
+                <p>
+                    Serwis stanowi własność Administratora i jest chroniony prawem autorskim.
+                    Użytkownik zachowuje pełne prawa do przesłanych dokumentów i skonwertowanych plików.
+                </p>
+
+                <h3>9. Prywatność</h3>
+                <p>Zasady przetwarzania danych osobowych określa Polityka prywatności (dostępna z poziomu stopki strony).</p>
+
+                <h3>10. Zmiany regulaminu</h3>
+                <p>
+                    Administrator zastrzega sobie prawo do zmiany regulaminu. Zmiany wchodzą w życie
+                    z chwilą opublikowania. Korzystanie z Serwisu po zmianach oznacza akceptację nowego regulaminu.
+                </p>
+
+                <h3>11. Postanowienia końcowe</h3>
+                <p>
+                    W sprawach nieuregulowanych zastosowanie mają przepisy prawa polskiego.
+                    Spory rozstrzygane przez sądy właściwe dla siedziby Administratora.
+                </p>
+
+                <h3>12. Kontakt</h3>
+                <p>E-mail: <a href="mailto:kontakt@analizy.io">kontakt@analizy.io</a></p>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">Ostatnia aktualizacja: luty 2026</p>
             </div>
         </div>
     </div>
 
-    <!-- Theme Switcher JS -->
-    <script src="/static/js/theme-switcher.js"></script>
+    <!-- Modal: Polityka prywatności -->
+    <div id="modal-prywatnosc" class="modal-overlay hidden" onclick="zamknijModal(event, 'prywatnosc')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Polityka prywatności</h2>
+                <button class="modal-close" onclick="zamknijModalBtn('prywatnosc')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>1. Administrator danych</h3>
+                <p>
+                    Administratorem danych osobowych jest:<br>
+                    <strong>Fundacja Modulo</strong><br>
+                    ul. Wigury 30a lok. 11, 90-319 Łódź<br>
+                    KRS: 0001046866 · NIP: 7252333207 · REGON: 525827606<br>
+                    E-mail: <a href="mailto:kontakt@analizy.io">kontakt@analizy.io</a>
+                </p>
 
-    <!-- Cookie Consent & Google Analytics -->
+                <h3>2. Zakres i cel przetwarzania danych</h3>
+                <p>
+                    <strong>Serwis nie wymaga rejestracji, logowania ani podawania danych osobowych.</strong>
+                    Przesłane pliki są przetwarzane na serwerze wyłącznie w celu konwersji i usuwane natychmiast
+                    po jej zakończeniu. Dane nie są zapisywane ani przekazywane osobom trzecim.
+                </p>
+                <p>Dane przetwarzane automatycznie:</p>
+                <ul>
+                    <li><strong>Dane techniczne serwera</strong> — adres IP, typ przeglądarki, system operacyjny, data żądania. Przetwarzane w celu zapewnienia działania i bezpieczeństwa (art. 6 ust. 1 lit. f RODO).</li>
+                    <li><strong>Dane analityczne</strong> — anonimowe statystyki ruchu zbierane przez Google Analytics wyłącznie po wyrażeniu zgody (art. 6 ust. 1 lit. a RODO).</li>
+                </ul>
+                <p>
+                    <strong>Serwis nie gromadzi metadanych konwersji</strong> — nazwy plików, nazwy firm, NIP-y ani daty konwersji nie są zapisywane.
+                </p>
+
+                <h3>3. Pliki cookies</h3>
+                <p><strong>A. Cookies niezbędne (funkcjonalne):</strong></p>
+                <ul>
+                    <li><strong>cookie_consent</strong> — zapamiętanie preferencji cookies (ważność: 1 rok)</li>
+                </ul>
+                <p>
+                    Cookies funkcjonalne nie wymagają odrębnej zgody (art. 173 ust. 3 Prawa telekomunikacyjnego).
+                </p>
+                <p><strong>B. Cookies analityczne (Google Analytics):</strong></p>
+                <p>Instalowane <strong>wyłącznie po wyrażeniu zgody</strong> za pośrednictwem banera cookies.</p>
+                <ul>
+                    <li><strong>_ga</strong> — identyfikator użytkownika GA (ważność: 2 lata)</li>
+                    <li><strong>_ga_*</strong> — utrzymanie stanu sesji GA (ważność: 2 lata)</li>
+                </ul>
+                <p>
+                    Google Analytics zbiera anonimowe dane statystyczne (liczba odwiedzin, lokalizacja, urządzenie, przeglądarka).
+                    Anonimizacja IP jest włączona. Usługa świadczona przez Google Ireland Limited.
+                </p>
+
+                <h3>4. Zarządzanie cookies</h3>
+                <ul>
+                    <li>Zmiana preferencji — kliknij „Ustawienia cookies" w stopce strony</li>
+                    <li>Blokowanie GA — zainstaluj <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics Opt-out</a></li>
+                    <li>Ustawienia przeglądarki — zablokuj cookies w ustawieniach prywatności</li>
+                </ul>
+
+                <h3>5. Przechowywanie danych</h3>
+                <ul>
+                    <li><strong>Pliki po konwersji:</strong> do pobrania przez 5 minut, potem automatycznie usuwane</li>
+                    <li><strong>Metadane konwersji:</strong> nie są gromadzone</li>
+                    <li><strong>Logi serwera:</strong> do 30 dni</li>
+                    <li><strong>Dane Google Analytics:</strong> zgodnie z polityką Google (domyślnie 26 miesięcy)</li>
+                </ul>
+
+                <h3>6. Prawa użytkownika</h3>
+                <p>Na podstawie RODO przysługują Ci prawa:</p>
+                <ul>
+                    <li>prawo dostępu do danych (art. 15 RODO)</li>
+                    <li>prawo do sprostowania (art. 16 RODO)</li>
+                    <li>prawo do usunięcia — „prawo do bycia zapomnianym" (art. 17 RODO)</li>
+                    <li>prawo do ograniczenia przetwarzania (art. 18 RODO)</li>
+                    <li>prawo do przenoszenia danych (art. 20 RODO)</li>
+                    <li>prawo do sprzeciwu (art. 21 RODO)</li>
+                    <li>prawo do cofnięcia zgody (art. 7 ust. 3 RODO)</li>
+                    <li>prawo do skargi do UODO — ul. Stawki 2, 00-193 Warszawa (<a href="https://uodo.gov.pl" target="_blank" rel="noopener">uodo.gov.pl</a>)</li>
+                </ul>
+                <p>
+                    Serwis nie wymaga rejestracji — realizacja niektórych praw może nie mieć zastosowania.
+                    Dla cookies analitycznych wystarczy cofnięcie zgody poprzez zmianę ustawień cookies.
+                </p>
+
+                <h3>7. Udostępnianie i transfer danych</h3>
+                <p>
+                    Dane nie są sprzedawane ani udostępniane w celach marketingowych. W związku z Google Analytics
+                    dane mogą być przekazywane poza EOG — Google stosuje standardowe klauzule umowne (art. 46 ust. 2 lit. c RODO).
+                </p>
+
+                <h3>8. Zmiany polityki</h3>
+                <p>
+                    Administrator zastrzega prawo do zmiany polityki prywatności. O istotnych zmianach
+                    użytkownicy zostaną poinformowani komunikatem na stronie.
+                </p>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">Ostatnia aktualizacja: luty 2026</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
     <script>
-        // Sprawdź czy użytkownik już wyraził zgodę
-        function checkCookieConsent() {
-            const consent = localStorage.getItem('cookie-consent');
-            if (consent === 'accepted') {
-                document.getElementById('cookie-consent').classList.add('hidden');
-                loadGoogleAnalytics();
-            } else if (consent === 'declined') {
-                document.getElementById('cookie-consent').classList.add('hidden');
+        // Modal functions
+        function pokazModal(typ) {
+            document.getElementById('modal-' + typ).classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function zamknijModal(event, typ) {
+            if (event.target === document.getElementById('modal-' + typ)) {
+                document.getElementById('modal-' + typ).classList.add('hidden');
+                document.body.style.overflow = '';
             }
         }
 
-        function acceptCookies() {
-            localStorage.setItem('cookie-consent', 'accepted');
-            document.getElementById('cookie-consent').classList.add('hidden');
-            loadGoogleAnalytics();
+        function zamknijModalBtn(typ) {
+            document.getElementById('modal-' + typ).classList.add('hidden');
+            document.body.style.overflow = '';
         }
 
-        function declineCookies() {
-            localStorage.setItem('cookie-consent', 'declined');
-            document.getElementById('cookie-consent').classList.add('hidden');
+        // Cookie consent & Google Analytics
+        function sprawdzCookies() {
+            const consent = localStorage.getItem('cookie_consent');
+            if (!consent) {
+                document.getElementById('cookie-consent').classList.remove('hidden');
+            } else if (consent === 'all') {
+                zaladujGoogleAnalytics();
+            }
         }
 
-        function loadGoogleAnalytics() {
+        function akceptujCookies() {
+            localStorage.setItem('cookie_consent', 'all');
+            document.getElementById('cookie-consent').classList.add('hidden');
+            zaladujGoogleAnalytics();
+        }
+
+        function akceptujTylkoNiezbedne() {
+            localStorage.setItem('cookie_consent', 'necessary');
+            document.getElementById('cookie-consent').classList.add('hidden');
+            usunCookiesGA();
+        }
+
+        function zmienUstawieniaCookies() {
+            localStorage.removeItem('cookie_consent');
+            usunCookiesGA();
+            window.gaLoaded = false;
+            document.getElementById('cookie-consent').classList.remove('hidden');
+        }
+
+        function usunCookiesGA() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const name = cookie.split('=')[0].trim();
+                if (name.startsWith('_ga')) {
+                    document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                    document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + window.location.hostname;
+                }
+            }
+        }
+
+        function zaladujGoogleAnalytics() {
+            if (window.gaLoaded) return;
+            window.gaLoaded = true;
+
             {% if ga_measurement_id %}
-            // Google Analytics
+            const GA_ID = '{{ ga_measurement_id }}';
             const script = document.createElement('script');
             script.async = true;
-            script.src = 'https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}';
+            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
             document.head.appendChild(script);
 
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
             gtag('js', new Date());
-            gtag('config', '{{ ga_measurement_id }}');
+            gtag('config', GA_ID, { 'anonymize_ip': true });
             {% endif %}
         }
 
-        // Sprawdź zgodę przy ładowaniu strony
-        checkCookieConsent();
+        // Security banner
+        function sprawdzBanerBezpieczenstwa() {
+            if (sessionStorage.getItem('security_banner_closed') === '1') {
+                document.getElementById('security-banner').classList.add('hidden');
+            }
+        }
+
+        function zamknijBanerBezpieczenstwa() {
+            sessionStorage.setItem('security_banner_closed', '1');
+            document.getElementById('security-banner').classList.add('hidden');
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', function() {
+            sprawdzCookies();
+            sprawdzBanerBezpieczenstwa();
+        });
     </script>
 </body>
 </html>

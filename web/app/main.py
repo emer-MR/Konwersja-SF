@@ -262,23 +262,20 @@ async def htmx_convert(
         # Konwertuj
         metadata = convert_file(str(input_path), str(output_path), str(attachments_subdir))
 
-        # Zapisz do bazy danych (dla admina)
-        conversion = Conversion(
-            input_filename=filename,
-            company_name=metadata.get("company_name"),
-            company_nip=metadata.get("company_nip"),
-        )
-
-        # Archiwizuj dla admina (jeśli włączone)
+        # Zapisz do bazy i archiwizuj (tylko gdy włączone gromadzenie danych)
         if settings.ADMIN_FILE_RETENTION_DAYS > 0:
+            conversion = Conversion(
+                input_filename=filename,
+                company_name=metadata.get("company_name"),
+                company_nip=metadata.get("company_nip"),
+            )
             archive_dir = settings.ADMIN_ARCHIVE_DIR / session_id
             archive_dir.mkdir(parents=True, exist_ok=True)
             archive_xlsx = archive_dir / f"{session_id}.xlsx"
             shutil.copy2(output_path, archive_xlsx)
             conversion.archive_path = str(archive_xlsx)
-
-        db.add(conversion)
-        await db.commit()
+            db.add(conversion)
+            await db.commit()
 
         # Zapisz plik tymczasowy dla użytkownika (5 minut)
         temp_files[session_id] = {

@@ -38,6 +38,8 @@ class SimpleXLSXConverter:
     HEADER_FONT = Font(bold=True)
     HEADER_FILL = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     TITLE_FONT = Font(bold=True, size=12)
+    DISCLAIMER_FONT = Font(italic=True, size=9, color="808080")
+    DISCLAIMER_TEXT = "Wygenerowano przez czytnik.analizy.io \u2014 narz\u0119dzie pomocnicze. Zweryfikuj poprawno\u015b\u0107 danych przed wykorzystaniem."
     MONEY_FORMAT = '#,##0.00'
     MONEY_FORMAT_TYS = '#,##0.00" tys."'
     DATE_FORMAT = 'YYYY-MM-DD'
@@ -233,30 +235,40 @@ class SimpleXLSXConverter:
         # Format: SF_2023_NazwaFirmy.xlsx
         return f"SF_{meta.okres_do.year}_{firma_clean}.xlsx"
 
+    def _add_disclaimer_header(self, ws):
+        """Dodaje wiersz z disclaimerem na górze arkusza."""
+        ws['A1'] = self.DISCLAIMER_TEXT
+        ws['A1'].font = self.DISCLAIMER_FONT
+        ws.merge_cells('A1:D1')
+        # Wiersz 2 pozostaje pusty (separator)
+
     def _create_bilans_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz Bilans."""
+        self._add_disclaimer_header(ws)
+        R = 2  # offset for disclaimer rows
+
         meta = spr.metadane
         firma = spr.dane_firmy
         weryfikacja = spr.weryfikacja
         jednostka = meta.jednostka_walutowa
 
         # Nagłówek
-        ws['A1'] = "BILANS"
-        ws['A1'].font = self.TITLE_FONT
+        ws[f'A{1+R}'] = "BILANS"
+        ws[f'A{1+R}'].font = self.TITLE_FONT
 
         # Dane firmy
-        ws['A2'] = "Firma:"
-        ws['B2'] = firma.nazwa
+        ws[f'A{2+R}'] = "Firma:"
+        ws[f'B{2+R}'] = firma.nazwa
 
-        ws['A3'] = "NIP:"
-        ws['B3'] = firma.nip
+        ws[f'A{3+R}'] = "NIP:"
+        ws[f'B{3+R}'] = firma.nip
 
         if firma.krs:
-            ws['A4'] = "KRS:"
-            ws['B4'] = firma.krs
+            ws[f'A{4+R}'] = "KRS:"
+            ws[f'B{4+R}'] = firma.krs
 
         # Okresy
-        row = 6
+        row = 6 + R
         ws[f'A{row}'] = "Okres sprawozdawczy:"
         ws[f'B{row}'] = f"{meta.okres_od} - {meta.okres_do}"
 
@@ -315,27 +327,30 @@ class SimpleXLSXConverter:
 
     def _create_rzis_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz RZiS."""
+        self._add_disclaimer_header(ws)
+        R = 2  # offset for disclaimer rows
+
         meta = spr.metadane
         firma = spr.dane_firmy
         jednostka = meta.jednostka_walutowa
 
         # Nagłówek
         wariant_nazwa = "WARIANT PORÓWNAWCZY" if meta.wariant_rzis == "porownawczy" else "WARIANT KALKULACYJNY"
-        ws['A1'] = f"RACHUNEK ZYSKÓW I STRAT ({wariant_nazwa})"
-        ws['A1'].font = self.TITLE_FONT
+        ws[f'A{1+R}'] = f"RACHUNEK ZYSKÓW I STRAT ({wariant_nazwa})"
+        ws[f'A{1+R}'].font = self.TITLE_FONT
 
         # Dane firmy
-        ws['A2'] = "Firma:"
-        ws['B2'] = firma.nazwa
+        ws[f'A{2+R}'] = "Firma:"
+        ws[f'B{2+R}'] = firma.nazwa
 
-        ws['A3'] = "Okres:"
-        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+        ws[f'A{3+R}'] = "Okres:"
+        ws[f'B{3+R}'] = f"{meta.okres_od} - {meta.okres_do}"
 
-        ws['A4'] = "Jednostka walutowa:"
-        ws['B4'] = jednostka
+        ws[f'A{4+R}'] = "Jednostka walutowa:"
+        ws[f'B{4+R}'] = jednostka
 
         # Nagłówki kolumn
-        row = 6
+        row = 6 + R
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
@@ -363,22 +378,25 @@ class SimpleXLSXConverter:
         (przekształcone dane porównawcze). Kolumna D jest dodawana dla
         spójności formatu, ale pozostaje pusta.
         """
+        self._add_disclaimer_header(ws)
+        R = 2  # offset for disclaimer rows
+
         meta = spr.metadane
         firma = spr.dane_firmy
         jednostka = meta.jednostka_walutowa
 
         # Nagłówek
-        ws['A1'] = "NOTA PODATKOWA (Dodatkowe Informacje i Objaśnienia)"
-        ws['A1'].font = self.TITLE_FONT
+        ws[f'A{1+R}'] = "NOTA PODATKOWA (Dodatkowe Informacje i Objaśnienia)"
+        ws[f'A{1+R}'].font = self.TITLE_FONT
 
-        ws['A2'] = "Firma:"
-        ws['B2'] = firma.nazwa
+        ws[f'A{2+R}'] = "Firma:"
+        ws[f'B{2+R}'] = firma.nazwa
 
-        ws['A3'] = "Okres:"
-        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+        ws[f'A{3+R}'] = "Okres:"
+        ws[f'B{3+R}'] = f"{meta.okres_od} - {meta.okres_do}"
 
         # Nagłówki kolumn
-        row = 5
+        row = 5 + R
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
@@ -401,22 +419,25 @@ class SimpleXLSXConverter:
 
     def _create_kapital_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz Zestawienie zmian w kapitale własnym."""
+        self._add_disclaimer_header(ws)
+        R = 2  # offset for disclaimer rows
+
         meta = spr.metadane
         firma = spr.dane_firmy
         jednostka = meta.jednostka_walutowa
 
         # Nagłówek
-        ws['A1'] = "ZESTAWIENIE ZMIAN W KAPITALE (FUNDUSZU) WŁASNYM"
-        ws['A1'].font = self.TITLE_FONT
+        ws[f'A{1+R}'] = "ZESTAWIENIE ZMIAN W KAPITALE (FUNDUSZU) WŁASNYM"
+        ws[f'A{1+R}'].font = self.TITLE_FONT
 
-        ws['A2'] = "Firma:"
-        ws['B2'] = firma.nazwa
+        ws[f'A{2+R}'] = "Firma:"
+        ws[f'B{2+R}'] = firma.nazwa
 
-        ws['A3'] = "Okres:"
-        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+        ws[f'A{3+R}'] = "Okres:"
+        ws[f'B{3+R}'] = f"{meta.okres_od} - {meta.okres_do}"
 
         # Nagłówki kolumn
-        row = 5
+        row = 5 + R
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"
@@ -439,23 +460,26 @@ class SimpleXLSXConverter:
 
     def _create_przeplywy_sheet(self, ws, spr: Sprawozdanie):
         """Tworzy arkusz Rachunek przepływów pieniężnych."""
+        self._add_disclaimer_header(ws)
+        R = 2  # offset for disclaimer rows
+
         meta = spr.metadane
         firma = spr.dane_firmy
         jednostka = meta.jednostka_walutowa
 
         # Nagłówek
         wariant_nazwa = "METODA BEZPOŚREDNIA" if spr.wariant_przeplywow == "bezposredni" else "METODA POŚREDNIA"
-        ws['A1'] = f"RACHUNEK PRZEPŁYWÓW PIENIĘŻNYCH ({wariant_nazwa})"
-        ws['A1'].font = self.TITLE_FONT
+        ws[f'A{1+R}'] = f"RACHUNEK PRZEPŁYWÓW PIENIĘŻNYCH ({wariant_nazwa})"
+        ws[f'A{1+R}'].font = self.TITLE_FONT
 
-        ws['A2'] = "Firma:"
-        ws['B2'] = firma.nazwa
+        ws[f'A{2+R}'] = "Firma:"
+        ws[f'B{2+R}'] = firma.nazwa
 
-        ws['A3'] = "Okres:"
-        ws['B3'] = f"{meta.okres_od} - {meta.okres_do}"
+        ws[f'A{3+R}'] = "Okres:"
+        ws[f'B{3+R}'] = f"{meta.okres_od} - {meta.okres_do}"
 
         # Nagłówki kolumn
-        row = 5
+        row = 5 + R
         ws[f'A{row}'] = "Pozycja"
         ws[f'B{row}'] = f"Rok {meta.okres_do.year} ({jednostka})"
         ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} ({jednostka})"

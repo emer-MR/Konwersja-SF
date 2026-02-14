@@ -597,15 +597,114 @@ label {
 }
 
 /* ============================================
-   Footer
+   Security Banner
+   ============================================ */
+.security-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid #22c55e;
+    border-radius: var(--border-radius-lg);
+    padding: 18px 22px;
+    margin-bottom: 0;
+    font-size: 0.9375rem;
+    color: #15803d;
+    line-height: 1.6;
+}
+
+.security-banner-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.security-banner-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.security-banner-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: #22c55e;
+}
+
+.security-banner-disclaimer {
+    font-size: 0.9375rem;
+    color: #64748b;
+    line-height: 1.6;
+    padding-left: 36px;
+}
+
+.security-banner-close {
+    background: none !important;
+    border: none !important;
+    font-size: 20px;
+    color: #86efac !important;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.security-banner-close:hover {
+    color: #15803d !important;
+}
+
+.security-banner.hidden {
+    display: none;
+}
+
+/* Dark mode support for security banner */
+[data-theme="dark"] .security-banner,
+[data-theme="midnight"] .security-banner {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.2);
+    border-left-color: #22c55e;
+}
+
+[data-theme="dark"] .security-banner-disclaimer,
+[data-theme="midnight"] .security-banner-disclaimer {
+    color: #94a3b8;
+}
+
+/* ============================================
+   Footer (fixed)
    ============================================ */
 footer.main-footer {
-    margin-top: 4rem;
-    padding: 2rem 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--theme-bg-card);
     border-top: 1px solid var(--theme-border);
-    text-align: center;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    font-size: 0.75rem;
+    z-index: 100;
     color: var(--theme-text-muted);
-    font-size: 0.875rem;
+}
+
+footer.main-footer a {
+    color: var(--theme-text-muted);
+    text-decoration: none;
+}
+
+footer.main-footer a:hover {
+    color: var(--theme-primary);
+}
+
+/* Padding for main content to avoid footer overlap */
+main.container {
+    padding-bottom: 3rem;
 }
 
 /* ============================================

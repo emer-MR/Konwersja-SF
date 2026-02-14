@@ -1,6 +1,6 @@
 # Deploy Konwertera SF na Hostinger VPS z Docker Manager
 
-**Docelowy URL:** https://konwersja.analizy.io
+**Domena:** https://czytnik.analizy.io
 
 ## Spis treści
 1. [Wymagania](#wymagania)
@@ -43,7 +43,7 @@ Zapisz wygenerowany klucz - będzie potrzebny w konfiguracji.
 
 | Typ | Nazwa | Wskazuje na | TTL |
 |-----|-------|-------------|-----|
-| A | konwersja | `IP_TWOJEGO_VPS` | 14400 |
+| A | czytnik | `IP_TWOJEGO_VPS` | 14400 |
 
 4. Poczekaj na propagację DNS (może potrwać do 24h, zazwyczaj 5-30 min)
 
@@ -51,10 +51,10 @@ Zapisz wygenerowany klucz - będzie potrzebny w konfiguracji.
 
 ```bash
 # Sprawdź czy DNS działa
-nslookup konwersja.analizy.io
+nslookup czytnik.analizy.io
 
 # lub
-dig konwersja.analizy.io
+dig czytnik.analizy.io
 ```
 
 ---
@@ -173,29 +173,29 @@ apt install -y nginx certbot python3-certbot-nginx
 
 ### Krok 2: Skopiuj konfigurację Nginx
 
-Plik konfiguracyjny jest już przygotowany: `web/nginx/konwersja.analizy.io.conf`
+Plik konfiguracyjny jest już przygotowany: `web/nginx/czytnik.analizy.io.conf`
 
 **Opcja A: Przez SCP (z lokalnego komputera)**
 ```bash
-scp web/nginx/konwersja.analizy.io.conf root@IP_VPS:/etc/nginx/sites-available/
+scp web/nginx/czytnik.analizy.io.conf root@IP_VPS:/etc/nginx/sites-available/
 ```
 
 **Opcja B: Przez SSH (ręcznie)**
 ```bash
-nano /etc/nginx/sites-available/konwersja.analizy.io.conf
-# Wklej zawartość pliku web/nginx/konwersja.analizy.io.conf
+nano /etc/nginx/sites-available/czytnik.analizy.io.conf
+# Wklej zawartość pliku web/nginx/czytnik.analizy.io.conf
 ```
 
 **Opcja C: Przez git (jeśli sklonowałeś repo)**
 ```bash
-cp ~/konwerter-sf/web/nginx/konwersja.analizy.io.conf /etc/nginx/sites-available/
+cp ~/konwerter-sf/web/nginx/czytnik.analizy.io.conf /etc/nginx/sites-available/
 ```
 
 ### Krok 3: Aktywacja konfiguracji
 
 ```bash
 # Utwórz symlink
-ln -s /etc/nginx/sites-available/konwersja.analizy.io.conf /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/czytnik.analizy.io.conf /etc/nginx/sites-enabled/
 
 # Sprawdź poprawność konfiguracji
 nginx -t
@@ -207,7 +207,7 @@ systemctl reload nginx
 ### Krok 4: Certyfikat SSL (Let's Encrypt)
 
 ```bash
-certbot --nginx -d konwersja.analizy.io
+certbot --nginx -d czytnik.analizy.io
 ```
 
 Certbot automatycznie:
@@ -358,9 +358,9 @@ docker stats --no-stream
 | Plik | Cel | Opis |
 |------|-----|------|
 | `docker-compose.hostinger.yml` | Docker | Konfiguracja kontenerów |
-| `nginx/konwersja.analizy.io.conf` | Nginx | Reverse proxy + cache |
+| `nginx/czytnik.analizy.io.conf` | Nginx | Reverse proxy + cache |
 | `.env` | Aplikacja | Zmienne środowiskowe (tworzysz na VPS) |
 
 ---
 
-*Dokumentacja: 01.12.2025 | Domena: konwersja.analizy.io*
+*Dokumentacja: luty 2026 | Domena: czytnik.analizy.io*

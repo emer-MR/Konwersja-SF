@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Aplikacja
     APP_NAME: str = "Czytnik SF"
-    APP_VERSION: str = "2.0.0"
+    APP_VERSION: str = "3.0.0"
     DEBUG: bool = False
 
     # Baza danych
@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     # Czas życia plików dla użytkownika (w minutach)
     USER_FILE_EXPIRY_MINUTES: int = 5
 
-    # Czas przechowywania plików dla admina (w dniach, 0 = nie przechowuj)
-    ADMIN_FILE_RETENTION_DAYS: int = 30
+    # Czas przechowywania plików i metadanych dla admina (w dniach, 0 = nie gromadź)
+    ADMIN_FILE_RETENTION_DAYS: int = 0
 
     # Google Analytics
     GA_MEASUREMENT_ID: str = ""  # Format: G-XXXXXXXXXX

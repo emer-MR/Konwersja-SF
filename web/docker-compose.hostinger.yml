@@ -1,5 +1,5 @@
 # Docker Compose dla Hostinger VPS - Czytnik SF
-# Może być użyty przez Docker Manager (GUI) lub SSH
+# Domena: czytnik.analizy.io
 #
 # Użycie przez SSH:
 #   docker compose -f docker-compose.hostinger.yml up -d
@@ -40,7 +40,7 @@ services:
       # Opcjonalne - domyślne wartości
       - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/app.db}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-15}
-      - ADMIN_FILE_RETENTION_DAYS=${ADMIN_FILE_RETENTION_DAYS:-30}
+      - ADMIN_FILE_RETENTION_DAYS=${ADMIN_FILE_RETENTION_DAYS:-0}
       - DEBUG=${DEBUG:-false}
 
       # Dane kontaktowe

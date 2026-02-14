@@ -8,202 +8,83 @@
 {% endif %}
 {% endblock %}
 
-{% block content %}
-<!-- Hero Section -->
-<section class="hero">
-    <h1>Czytnik <span>Sprawozdań</span><br>Finansowych</h1>
-    <p>Przekształć e-Sprawozdanie XML na czytelny plik Excel w kilka sekund. Bezpłatnie, bez rejestracji.</p>
-</section>
-
-<!-- Converter Section -->
-<article id="converter">
-    <header>
-        <h2>Odczytaj sprawozdanie i zamień je w plik xlsx</h2>
-        <p>Prześlij plik XML (e-Sprawozdanie) aby otrzymać plik Excel z Bilansem, RZiS i innymi elementami.</p>
-    </header>
-
-    <!-- Formularz uploadu -->
-    <form
-        id="upload-form"
-        hx-post="/htmx/convert"
-        hx-encoding="multipart/form-data"
-        hx-target="#result"
-        hx-swap="innerHTML"
-        hx-indicator="#upload-indicator"
-    >
-        <div class="upload-area" id="drop-zone">
-            <div class="upload-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-            </div>
-            <p class="upload-title">Przeciągnij plik XML tutaj</p>
-            <p class="upload-subtitle">lub kliknij aby wybrać plik</p>
-            <input
-                type="file"
-                id="file"
-                name="file"
-                accept=".xml,.xades"
-                required
-            >
-            <p id="selected-file" class="selected-file"></p>
-            <p class="upload-hint">Akceptowane formaty: XML, XAdES (max 10 MB)</p>
-        </div>
-
-        {% if recaptcha_enabled %}
-        <div class="recaptcha-container">
-            <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
-        </div>
-        {% endif %}
-
-        <button type="submit" id="submit-btn" class="convert-btn">
-            <span id="upload-indicator" class="htmx-indicator">
-                <span class="spinner"></span>
-            </span>
-            <span class="btn-text">Konwertuj do Excel</span>
-        </button>
-    </form>
-
-    <!-- Wynik konwersji -->
-    <div id="result"></div>
-</article>
-
-<!-- Features Section -->
-<section class="features-grid">
-    <div class="feature-card">
-        <div class="feature-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        </div>
-        <h3>Pełne sprawozdanie</h3>
-        <p>Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale, Rachunek przepływów</p>
-    </div>
-
-    <div class="feature-card">
-        <div class="feature-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-        </div>
-        <h3>Najważniejsze typy jednostek</h3>
-        <p>Obsługa sprawozdań Mikro, Małych i Innych jednostek zgodnie ze schematami ze strony <a href="https://www.gov.pl/web/kas/struktury-e-sprawozdan" target="_blank" rel="noopener">Ministerstwa Finansów</a></p>
-    </div>
-
-    <div class="feature-card">
-        <div class="feature-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-        </div>
-        <h3>Obsługa załączników</h3>
-        <p>Automatyczne wyodrębnianie PDF i innych dokumentów osadzonych w XML</p>
-    </div>
-</section>
-
-<!-- How it works -->
-<section class="steps-section">
-    <h2>Jak to działa?</h2>
-    <div class="steps-grid">
-        <div class="step">
-            <div class="step-number">1</div>
-            <h4>Prześlij XML</h4>
-            <p>Wybierz plik e-Sprawozdania</p>
-        </div>
-
-        <div class="step">
-            <div class="step-number">2</div>
-            <h4>Potwierdź CAPTCHA</h4>
-            <p>Weryfikacja antyspamowa</p>
-        </div>
-
-        <div class="step">
-            <div class="step-number">3</div>
-            <h4>Pobierz Excel</h4>
-            <p>Gotowy plik ze wszystkimi arkuszami</p>
-        </div>
-    </div>
-</section>
-
-<!-- Contact Section -->
-<section class="contact-section" id="kontakt">
-    <h2>Kontakt</h2>
-    <div class="contact-info">
-        <div class="contact-item">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
-        </div>
-        {% if contact_address %}
-        <div class="contact-item">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span>{{ contact_address }}</span>
-        </div>
-        {% endif %}
-    </div>
-</section>
-
-<style>
-    /* Hero */
-    .hero {
+{% block extra_styles %}
+    /* ===== HOW IT WORKS ===== */
+    .steps-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    .step {
         text-align: center;
-        padding: 3rem 0;
+        padding: 20px 16px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .step-number {
+        width: 36px;
+        height: 36px;
+        background: #0d9488;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0 auto 10px;
+    }
+    .step h4 {
+        margin: 0 0 4px 0;
+        font-size: 15px;
+        color: #1e293b;
+    }
+    .step p {
+        margin: 0;
+        font-size: 13px;
+        color: #64748b;
     }
 
-    .hero h1 {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .hero h1 span {
-        color: var(--theme-primary, var(--pico-primary));
-    }
-
-    .hero p {
-        font-size: 1.1rem;
-        color: var(--pico-muted-color);
-        max-width: 600px;
-        margin: 0 auto;
-    }
-
-    /* Upload */
+    /* ===== UPLOAD AREA ===== */
     .upload-area {
-        border: 3px dashed var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        padding: 3rem 2rem;
+        border: 3px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 32px 24px;
         text-align: center;
-        margin-bottom: 1.5rem;
-        transition: all 0.3s ease;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
         cursor: pointer;
-        background-color: var(--pico-card-background-color);
+        background: #f8fafc;
     }
-
     .upload-area:hover {
-        border-color: var(--pico-primary);
-        background-color: var(--pico-card-sectioning-background-color);
+        border-color: #0d9488;
+        background: #f0fdfa;
     }
-
     .upload-area.dragover {
-        border-color: var(--pico-primary);
-        background-color: var(--pico-primary-focus);
+        border-color: #0d9488;
+        background: #ccfbf1;
         border-style: solid;
     }
-
     .upload-icon {
-        color: var(--pico-muted-color);
-        margin-bottom: 1rem;
+        color: #94a3b8;
+        margin-bottom: 8px;
     }
-
     .upload-area:hover .upload-icon {
-        color: var(--pico-primary);
+        color: #0d9488;
     }
-
     .upload-title {
-        font-size: 1.25rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+        color: #334155;
     }
-
     .upload-subtitle {
-        color: var(--pico-muted-color);
-        margin-bottom: 1rem;
+        color: #94a3b8;
+        font-size: 14px;
+        margin: 0 0 8px 0;
     }
-
     .upload-area input[type="file"] {
         position: absolute;
         width: 1px;
@@ -214,174 +95,218 @@
         clip: rect(0, 0, 0, 0);
         border: 0;
     }
-
     .selected-file {
-        margin-top: 1rem;
-        padding: 0.75rem 1rem;
-        background-color: var(--pico-primary-focus);
-        border-radius: var(--pico-border-radius);
-        font-weight: bold;
-        color: var(--pico-primary);
+        margin-top: 8px;
+        padding: 6px 12px;
+        background: #ccfbf1;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        color: #0d9488;
         display: none;
     }
-
     .selected-file.show {
-        display: block;
+        display: inline-block;
     }
-
     .upload-hint {
-        font-size: 0.875rem;
-        color: var(--pico-muted-color);
-        margin-top: 1rem;
-        margin-bottom: 0;
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 8px 0 0 0;
     }
 
+    /* ===== CONVERT BUTTON ===== */
     .convert-btn {
         width: 100%;
-        font-size: 1.1rem;
-        padding: 1rem;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        background: #0d9488;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
+        gap: 8px;
+        transition: background 0.2s;
+    }
+    .convert-btn:hover {
+        background: #0f766e;
     }
 
     .recaptcha-container {
-        margin-bottom: 1.5rem;
+        margin-bottom: 12px;
         display: flex;
         justify-content: center;
     }
 
-    /* Features */
+    /* ===== FEATURES ===== */
     .features-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        margin: 3rem 0;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
     }
-
     .feature-card {
-        background: var(--pico-card-background-color);
-        padding: 1.5rem;
-        border-radius: var(--pico-border-radius);
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
         text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-
     .feature-icon {
-        color: var(--theme-primary, var(--pico-primary));
-        margin-bottom: 1rem;
+        color: #0d9488;
+        margin-bottom: 10px;
     }
-
     .feature-card h3 {
-        margin-bottom: 0.5rem;
-        font-size: 1.1rem;
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
     }
-
     .feature-card p {
-        color: var(--pico-muted-color);
-        font-size: 0.9rem;
+        color: #64748b;
+        font-size: 13px;
         margin: 0;
+        line-height: 1.5;
+    }
+    .feature-card a {
+        color: #0d9488;
     }
 
-    /* Steps */
-    .steps-section {
-        text-align: center;
-        margin: 3rem 0;
+    /* ===== PREVIEW TABLE ===== */
+    .preview-section {
+        margin-top: 12px;
     }
-
-    .steps-section h2 {
-        margin-bottom: 2rem;
+    .preview-section summary {
+        cursor: pointer;
+        padding: 8px 0;
+        font-size: 14px;
     }
-
-    .steps-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 2rem;
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
     }
-
-    .step {
-        text-align: center;
+    .preview-table th, .preview-table td {
+        padding: 6px 10px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
     }
-
-    .step-number {
-        width: 3rem;
-        height: 3rem;
-        background: var(--theme-primary, var(--pico-primary));
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        font-weight: bold;
-        margin: 0 auto 1rem;
-    }
-
-    .step h4 {
-        margin-bottom: 0.5rem;
-    }
-
-    .step p {
-        color: var(--pico-muted-color);
-        font-size: 0.9rem;
-        margin: 0;
-    }
-
-    /* Contact */
-    .contact-section {
-        text-align: center;
-        margin: 3rem 0;
-        padding: 2rem;
-        background: var(--pico-card-background-color);
-        border-radius: var(--pico-border-radius);
-    }
-
-    .contact-section h2 {
-        margin-bottom: 1.5rem;
-    }
-
-    .contact-info {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        align-items: center;
-    }
-
-    .contact-item {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        color: var(--pico-color);
-    }
-
-    .contact-item svg {
-        color: var(--theme-primary, var(--pico-primary));
-    }
-
-    .contact-item a {
-        color: var(--pico-color);
-    }
-
-    /* Footer links */
-    .footer-links {
-        margin-bottom: 0.5rem;
-    }
-
-    .footer-links a {
-        color: var(--pico-muted-color);
-        text-decoration: none;
-    }
-
-    .footer-links a:hover {
-        color: var(--pico-color);
+    .preview-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #475569;
     }
 
     @media (max-width: 768px) {
-        .hero h1 {
-            font-size: 1.75rem;
+        .steps-grid, .features-grid {
+            grid-template-columns: 1fr;
         }
     }
-</style>
+{% endblock %}
+
+{% block content %}
+<!-- How it works — above upload -->
+<div class="steps-grid">
+    <div class="step">
+        <div class="step-number">1</div>
+        <h4>Prześlij XML</h4>
+        <p>Wybierz plik e-Sprawozdania</p>
+    </div>
+    <div class="step">
+        <div class="step-number">2</div>
+        <h4>Potwierdź CAPTCHA</h4>
+        <p>Weryfikacja antyspamowa</p>
+    </div>
+    <div class="step">
+        <div class="step-number">3</div>
+        <h4>Pobierz Excel</h4>
+        <p>Gotowy plik ze wszystkimi arkuszami</p>
+    </div>
+</div>
+
+<!-- Converter Section -->
+<div class="card">
+    <div class="card-header">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+        Konwertuj sprawozdanie
+    </div>
+    <div class="card-body">
+        <form
+            id="upload-form"
+            hx-post="/htmx/convert"
+            hx-encoding="multipart/form-data"
+            hx-target="#result"
+            hx-swap="innerHTML"
+            hx-indicator="#upload-indicator"
+        >
+            <div class="upload-area" id="drop-zone">
+                <div class="upload-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                </div>
+                <p class="upload-title">Przeciągnij plik XML tutaj</p>
+                <p class="upload-subtitle">lub kliknij aby wybrać plik</p>
+                <input
+                    type="file"
+                    id="file"
+                    name="file"
+                    accept=".xml,.xades"
+                    required
+                >
+                <p id="selected-file" class="selected-file"></p>
+                <p class="upload-hint">Akceptowane formaty: XML, XAdES (max 10 MB)</p>
+            </div>
+
+            {% if recaptcha_enabled %}
+            <div class="recaptcha-container">
+                <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+            </div>
+            {% endif %}
+
+            <button type="submit" id="submit-btn" class="convert-btn">
+                <span id="upload-indicator" class="htmx-indicator">
+                    <span class="spinner"></span>
+                </span>
+                <span class="btn-text">Konwertuj do Excel</span>
+            </button>
+        </form>
+
+        <!-- Wynik konwersji -->
+        <div id="result"></div>
+    </div>
+</div>
+
+<!-- Features -->
+<div class="features-grid">
+    <div class="feature-card">
+        <div class="feature-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <h3>Pełne sprawozdanie</h3>
+        <p>Każdy element w osobnym arkuszu: Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale, Rachunek przepływów</p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        </div>
+        <h3>Najczęstsze typy jednostek</h3>
+        <p>Mikro, Mała, Inna — schematy v1-0, v1-2, v1-3, warianty PLN i tys. PLN zgodnie ze <a href="https://www.gov.pl/web/kas/struktury-e-sprawozdan" target="_blank" rel="noopener">strukturami MF</a></p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </div>
+        <h3>Obsługa załączników</h3>
+        <p>Automatyczne wyodrębnianie PDF i innych dokumentów osadzonych w XML</p>
+    </div>
+</div>
 
 <script>
     // Drag & drop
@@ -389,12 +314,10 @@
     const fileInput = document.getElementById('file');
     const selectedFileDisplay = document.getElementById('selected-file');
 
-    // Klik na strefę = klik na input
     dropZone.addEventListener('click', () => {
         fileInput.click();
     });
 
-    // Pokaż nazwę wybranego pliku
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
             selectedFileDisplay.textContent = fileInput.files[0].name;
@@ -427,13 +350,10 @@
         }
     });
 
-    // Po udanej konwersji
     document.body.addEventListener('htmx:afterRequest', function(evt) {
         if (evt.detail.pathInfo.requestPath === '/htmx/convert' && evt.detail.successful) {
-            // Wyczyść wybór pliku
             fileInput.value = '';
             selectedFileDisplay.classList.remove('show');
-            // Reset reCAPTCHA jeśli istnieje
             if (typeof grecaptcha !== 'undefined') {
                 grecaptcha.reset();
             }

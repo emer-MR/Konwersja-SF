@@ -1,134 +1,97 @@
-# Konwerter SF - Wersja Webowa
+# Czytnik SF - Wersja Webowa
 
-Aplikacja webowa do konwersji sprawozdań finansowych XML na Excel.
+Bezpłatna aplikacja webowa do konwersji polskich e-Sprawozdań finansowych XML na Excel (XLSX).
+
+**Domena produkcyjna:** https://czytnik.analizy.io
 
 ## Funkcjonalności
 
-- Rejestracja i logowanie użytkowników
-- Upload plików XML (e-Sprawozdania)
-- Konwersja do XLSX (Bilans + RZiS)
-- Limit 10 konwersji dziennie
-- Historia konwersji
+- Upload plików XML/XAdES (e-Sprawozdania, max 10 MB)
+- Konwersja do XLSX — Bilans, RZiS, Nota podatkowa, Zestawienie zmian, Przepływy
+- Obsługa jednostek: Mikro, Mała, Inna (schematy v1-0, v1-2, v1-3)
+- Wyodrębnianie załączników PDF z XML
+- Disclaimer informacyjny w generowanych plikach
+- Google reCAPTCHA v2 (ochrona antyspamowa)
+- Google Analytics z GDPR cookie consent
+- Brak gromadzenia danych o konwersjach (prywatność)
 
 ## Stack technologiczny
 
-- **Backend:** FastAPI + Uvicorn
-- **Baza danych:** SQLite (async)
-- **Frontend:** Jinja2 + HTMX + Pico CSS
-- **Konteneryzacja:** Docker
+- **Backend:** FastAPI + Uvicorn (Python 3.11)
+- **Baza danych:** SQLite (async) — tylko konta admin
+- **Frontend:** Jinja2 + HTMX (self-contained CSS)
+- **Konteneryzacja:** Docker + Traefik (Hostinger VPS)
 
 ## Uruchomienie lokalne
-
-### 1. Zainstaluj zależności
 
 ```bash
 cd web
 pip install -r requirements.txt
-```
-
-### 2. Uruchom serwer deweloperski
-
-```bash
 python run_local.py
 ```
 
 Lub bezpośrednio:
-
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. Otwórz przeglądarkę
-
+Dostęp:
 - Aplikacja: http://localhost:8000
+- Panel admina: http://localhost:8000/admin/login
 - Dokumentacja API: http://localhost:8000/docs
 
-## Uruchomienie na Docker (Synology NAS)
+## Deployment (Hostinger VPS)
 
-### 1. Przygotuj konfigurację
+```bash
+ssh root@72.62.1.15
+cd /docker/konwersja-sf
+git pull origin main
+cd web
+docker compose -f docker-compose.hostinger.yml up --build -d
+```
+
+Szczegóły: [deployment-czytnik-ok.md](deployment-czytnik-ok.md)
+
+## Konfiguracja
+
+Skopiuj `.env.example` jako `.env` i uzupełnij:
 
 ```bash
 cp .env.example .env
-# Edytuj .env i ustaw SECRET_KEY
 ```
 
-### 2. Zbuduj i uruchom
-
-```bash
-docker-compose up -d --build
-```
-
-### 3. Sprawdź status
-
-```bash
-docker-compose logs -f
-```
-
-Aplikacja będzie dostępna pod adresem: `http://twoj-nas:8080`
+Kluczowe zmienne:
+- `SECRET_KEY` — wygeneruj: `openssl rand -hex 32`
+- `RECAPTCHA_SITE_KEY` / `RECAPTCHA_SECRET_KEY` — klucze reCAPTCHA
+- `GA_MEASUREMENT_ID` — Google Analytics (domyślnie: G-BD3959F2HL)
+- `ADMIN_FILE_RETENTION_DAYS` — 0 = nie gromadź danych o konwersjach (domyślnie)
 
 ## Struktura projektu
 
 ```
 web/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py           # Główna aplikacja FastAPI
-│   ├── config.py         # Konfiguracja
-│   ├── database.py       # SQLAlchemy async
-│   ├── models.py         # Modele (User, Conversion)
-│   ├── schemas.py        # Schematy Pydantic
-│   ├── auth.py           # Autoryzacja JWT
-│   ├── converter_simple.py  # Uproszczony konwerter
-│   ├── api/
-│   │   ├── auth_routes.py
-│   │   └── convert_routes.py
+│   ├── main.py              # Główna aplikacja FastAPI
+│   ├── config.py            # Konfiguracja (pydantic-settings)
+│   ├── converter_simple.py  # Konwerter XML → XLSX
+│   ├── xml_validator.py     # Walidacja XML
+│   ├── database.py          # SQLAlchemy async
+│   ├── models.py            # Modele (User, Conversion)
+│   ├── auth.py              # Autentykacja JWT
 │   ├── templates/
-│   │   ├── base.html
-│   │   ├── index.html
-│   │   ├── login.html
-│   │   ├── register.html
-│   │   ├── convert.html
-│   │   └── partials/
+│   │   ├── base.html        # Szablon bazowy (CSS + modale + JS)
+│   │   ├── index.html       # Strona konwersji
+│   │   └── partials/        # Fragmenty HTMX
 │   └── static/
-├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.hostinger.yml  # Hostinger VPS z Traefik
+├── Dockerfile.prod               # Kontener produkcyjny
 ├── requirements.txt
 ├── run_local.py
-└── README.md
+└── .env.example
 ```
 
-## Konfiguracja na Synology
+## Dokumentacja
 
-### Wymagania
-
-- Docker zainstalowany na NAS
-- Dostęp SSH lub File Station
-
-### Instrukcja
-
-1. Skopiuj folder `web/` oraz `src/` na NAS (np. do `/volume1/docker/konwerter-sf/`)
-
-2. Utwórz plik `.env`:
-   ```bash
-   cd /volume1/docker/konwerter-sf/web
-   cp .env.example .env
-   nano .env  # ustaw SECRET_KEY
-   ```
-
-3. Zbuduj kontener:
-   ```bash
-   docker-compose up -d --build
-   ```
-
-4. (Opcjonalnie) Dodaj do Reverse Proxy w DSM:
-   - Panel sterowania → Brama aplikacji → Reverse Proxy
-   - Źródło: `https://sf.twoja-domena.pl`
-   - Cel: `http://localhost:8080`
-
-## Limity i bezpieczeństwo
-
-- Max 10 konwersji/dzień/użytkownik
-- Max rozmiar pliku: 10 MB
-- Pliki tymczasowe usuwane po konwersji
-- Hasła hashowane bcrypt
-- Tokeny JWT (24h ważności)
+- [dokumentacja-czytnik-ok.md](dokumentacja-czytnik-ok.md) — pełna dokumentacja techniczna
+- [deployment-czytnik-ok.md](deployment-czytnik-ok.md) — procedury wdrożenia i aktualizacji
+- [DEPLOY_HOSTINGER_VPS.md](DEPLOY_HOSTINGER_VPS.md) — szczegółowy przewodnik Hostinger VPS
