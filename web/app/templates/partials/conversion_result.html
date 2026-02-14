@@ -143,14 +143,6 @@
                     <th>Rachunek przepływów pieniężnych</th>
                     <td>{% if preview.sekcje.rachunek_przeplywow %}<span class="status-success">TAK</span> ({{ preview.przeplywy_total }} pozycji, {{ preview.wariant_przeplywow }}){% else %}<span class="status-muted">Brak w sprawozdaniu</span>{% endif %}</td>
                 </tr>
-                <tr>
-                    <th>Dane surowe</th>
-                    <td><span class="status-success">TAK</span> (wszystkie pozycje z kodami)</td>
-                </tr>
-                <tr>
-                    <th>Dane analityczne</th>
-                    <td><span class="status-success">TAK</span> (format długi do analizy)</td>
-                </tr>
                 {% if preview.attachments_count > 0 %}
                 <tr>
                     <th>Załączniki binarne</th>
@@ -163,66 +155,91 @@
     {% endif %}
     {% endif %}
 
-    <!-- Sekcja pobierania -->
-    <div class="download-section">
-        <h4>Pobierz pliki</h4>
-
-        <!-- Przycisk pobierania XLSX -->
-        <div class="download-buttons">
-            <a href="{{ download_url }}" role="button" class="download-btn primary">
-                Pobierz XLSX
-            </a>
-
-            <!-- Załączniki -->
-            {% if attachments and attachments|length > 0 %}
-            <div class="attachments-section">
-                <p class="attachments-title">Załączniki ({{ attachments|length }}):</p>
-
-                {% for att in attachments %}
-                <a href="{{ att.download_url }}" role="button" class="download-btn outline">
-                    Pobierz: {{ att.original_name }} ({{ att.size_kb }} KB)
-                </a>
-                {% endfor %}
-            </div>
-            {% endif %}
+    <!-- Sekcja pobierania — XLSX -->
+    <div class="download-card download-card-primary">
+        <div class="download-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
         </div>
+        <div class="download-card-info">
+            <div class="download-card-title">Sprawozdanie finansowe XLSX</div>
+            <div class="download-card-subtitle">
+                {% if company_name %}{{ company_name }}{% endif %}
+                {% if period_from and period_to %} · {{ period_from }} – {{ period_to }}{% endif %}
+            </div>
+        </div>
+        <a href="{{ download_url }}" class="download-card-btn download-card-btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Pobierz XLSX
+        </a>
     </div>
+
+    <!-- Sekcja pobierania — Załączniki -->
+    {% if attachments and attachments|length > 0 %}
+    {% for att in attachments %}
+    <div class="download-card download-card-attachment">
+        <div class="download-card-icon download-card-icon-attachment">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </div>
+        <div class="download-card-info">
+            <div class="download-card-title">{{ att.original_name }}</div>
+            <div class="download-card-subtitle">Załącznik · {{ att.size_kb }} KB</div>
+        </div>
+        <a href="{{ att.download_url }}" class="download-card-btn download-card-btn-attachment">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Pobierz
+        </a>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <p class="download-expiry">Link do pobrania wygasa za 5 minut</p>
 </div>
 
 <style>
     .conversion-result {
-        margin-top: 1rem;
+        margin-top: 16px;
     }
 
+    /* ===== PREVIEW SECTIONS ===== */
     .preview-section {
-        margin-bottom: 1rem;
-        border: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        padding: 0;
+        margin-bottom: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
     }
 
     .preview-section summary {
-        padding: 0.75rem 1rem;
-        background-color: var(--pico-card-sectioning-background-color);
+        padding: 10px 14px;
+        background: #f8fafc;
         cursor: pointer;
-        border-radius: var(--pico-border-radius);
+        font-size: 14px;
     }
 
     .preview-section[open] summary {
-        border-bottom: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius) var(--pico-border-radius) 0 0;
+        border-bottom: 1px solid #e2e8f0;
     }
 
     .preview-table {
+        width: 100%;
+        border-collapse: collapse;
         margin: 0;
-        font-size: 0.875rem;
+        font-size: 13px;
     }
 
     .preview-table th {
-        width: 180px;
+        width: 200px;
         text-align: left;
         font-weight: 600;
-        background-color: var(--pico-card-sectioning-background-color);
+        background: #f8fafc;
+        padding: 8px 12px;
+        color: #475569;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .preview-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        color: #334155;
     }
 
     .table-responsive {
@@ -231,100 +248,162 @@
 
     .bilans-preview th,
     .bilans-preview td {
-        padding: 0.5rem;
+        padding: 6px 10px;
     }
 
     .bilans-preview .text-right {
         text-align: right;
-        font-family: monospace;
+        font-family: 'Courier New', monospace;
     }
 
     .bilans-preview .level-0 td:first-child {
         font-weight: bold;
     }
-
     .bilans-preview .level-1 td:first-child {
-        padding-left: 1.5rem;
+        padding-left: 24px;
     }
-
     .bilans-preview .level-2 td:first-child {
-        padding-left: 3rem;
+        padding-left: 48px;
     }
-
     .bilans-preview .level-3 td:first-child {
-        padding-left: 4.5rem;
+        padding-left: 72px;
     }
 
     .preview-note {
-        font-size: 0.875rem;
-        color: var(--pico-muted-color);
+        font-size: 13px;
+        color: #94a3b8;
         text-align: center;
-        padding: 0.5rem;
+        padding: 8px;
         margin: 0;
     }
 
-    .download-section {
-        margin-top: 1.5rem;
-        padding: 1rem;
-        background-color: var(--pico-card-sectioning-background-color);
-        border-radius: var(--pico-border-radius);
+    /* ===== STATUS BADGES ===== */
+    .status-success {
+        color: #15803d;
+        font-weight: 600;
+    }
+    .status-error {
+        color: #dc2626;
+        font-weight: 600;
+    }
+    .status-muted {
+        color: #94a3b8;
+        font-style: italic;
     }
 
-    .download-section h4 {
-        margin-top: 0;
-        margin-bottom: 1rem;
-    }
-
-    .download-buttons {
+    /* ===== DOWNLOAD CARDS ===== */
+    .download-card {
         display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 18px;
+        border-radius: 10px;
+        margin-top: 12px;
     }
 
-    .download-btn {
-        display: inline-block;
-        text-align: center;
+    .download-card-primary {
+        background: #f0fdf4;
+        border: 2px solid #22c55e;
+    }
+
+    .download-card-attachment {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .download-card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .download-card-primary .download-card-icon {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .download-card-icon-attachment {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .download-card-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .download-card-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .download-card-subtitle {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .download-card-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
         text-decoration: none;
+        flex-shrink: 0;
+        transition: background 0.15s;
     }
 
-    .download-btn.primary {
-        background-color: var(--pico-primary);
+    .download-card-btn-primary {
+        background: #0d9488;
+        color: white;
+    }
+    .download-card-btn-primary:hover {
+        background: #0f766e;
         color: white;
     }
 
-    .download-btn.secondary {
-        background-color: var(--pico-secondary);
+    .download-card-btn-attachment {
+        background: #e2e8f0;
+        color: #475569;
+    }
+    .download-card-btn-attachment:hover {
+        background: #cbd5e1;
+        color: #334155;
     }
 
-    .download-btn.outline {
-        background-color: transparent;
-        border: 1px solid var(--pico-muted-border-color);
+    .download-expiry {
+        text-align: center;
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 12px 0 0 0;
     }
 
-    .attachments-section {
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid var(--pico-muted-border-color);
-    }
-
-    .attachments-title {
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-    }
-
-    .status-success {
-        color: #155724;
-        font-weight: bold;
-    }
-
-    .status-error {
-        color: #721c24;
-        font-weight: bold;
-    }
-
-    .status-muted {
-        color: var(--pico-muted-color);
-        font-style: italic;
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 600px) {
+        .download-card {
+            flex-wrap: wrap;
+        }
+        .download-card-btn {
+            width: 100%;
+            justify-content: center;
+        }
+        .preview-table th {
+            width: 140px;
+        }
     }
 </style>
 {% else %}
