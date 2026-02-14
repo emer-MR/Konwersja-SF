@@ -38,8 +38,8 @@ class SimpleXLSXConverter:
     HEADER_FONT = Font(bold=True)
     HEADER_FILL = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     TITLE_FONT = Font(bold=True, size=12)
-    DISCLAIMER_FONT = Font(italic=True, size=9, color="808080")
-    DISCLAIMER_TEXT = "Wygenerowano przez czytnik.analizy.io \u2014 narz\u0119dzie pomocnicze. Zweryfikuj poprawno\u015b\u0107 danych przed wykorzystaniem."
+    DISCLAIMER_FONT = Font(bold=True, size=9, color="808080")
+    DISCLAIMER_TEXT = "Wygenerowano przez czytnik.analizy.io. Zweryfikuj poprawność danych przed wykorzystaniem."
     MONEY_FORMAT = '#,##0.00'
     MONEY_FORMAT_TYS = '#,##0.00" tys."'
     DATE_FORMAT = 'YYYY-MM-DD'
@@ -239,7 +239,6 @@ class SimpleXLSXConverter:
         """Dodaje wiersz z disclaimerem na górze arkusza."""
         ws['A1'] = self.DISCLAIMER_TEXT
         ws['A1'].font = self.DISCLAIMER_FONT
-        ws.merge_cells('A1:D1')
         # Wiersz 2 pozostaje pusty (separator)
 
     def _create_bilans_sheet(self, ws, spr: Sprawozdanie):

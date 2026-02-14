@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Czytnik SF - Konwersja sprawozdań finansowych XML na Excel{% endblock %}
+{% block title %}Czytnik SF - Konwersja sprawozdań finansowych XML na XLSX{% endblock %}
 
 {% block head_extra %}
 {% if recaptcha_enabled %}
@@ -207,7 +207,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- How it works — above upload -->
+<!-- How it works - above upload -->
 <div class="steps-grid">
     <div class="step">
         <div class="step-number">1</div>
@@ -221,7 +221,7 @@
     </div>
     <div class="step">
         <div class="step-number">3</div>
-        <h4>Pobierz Excel</h4>
+        <h4>Pobierz XLSX</h4>
         <p>Gotowy plik ze wszystkimi arkuszami</p>
     </div>
 </div>
@@ -272,7 +272,7 @@
                 <span id="upload-indicator" class="htmx-indicator">
                     <span class="spinner"></span>
                 </span>
-                <span class="btn-text">Konwertuj do Excel</span>
+                <span class="btn-text">Konwertuj do XLSX</span>
             </button>
         </form>
 
@@ -288,7 +288,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         </div>
         <h3>Pełne sprawozdanie</h3>
-        <p>Każdy element w osobnym arkuszu: Bilans, RZiS, Nota podatkowa, Zestawienie zmian w kapitale, Rachunek przepływów</p>
+        <p>Każdy element w osobnym arkuszu: Bilans, RZiS, nota podatkowa, zestawienie zmian w kapitale, rachunek przepływów</p>
     </div>
 
     <div class="feature-card">
@@ -296,7 +296,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         </div>
         <h3>Najczęstsze typy jednostek</h3>
-        <p>Mikro, Mała, Inna — schematy v1-0, v1-2, v1-3, warianty PLN i tys. PLN zgodnie ze <a href="https://www.gov.pl/web/kas/struktury-e-sprawozdan" target="_blank" rel="noopener">strukturami MF</a></p>
+        <p>Mikro, mała, inna - schematy v1-0, v1-2, v1-3, warianty PLN i tys. PLN zgodnie ze <a href="https://www.gov.pl/web/kas/struktury-e-sprawozdan" target="_blank" rel="noopener">strukturami MF</a></p>
     </div>
 
     <div class="feature-card">
