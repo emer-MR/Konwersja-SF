@@ -34,8 +34,9 @@ services:
       - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY:-}
       - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:-}
 
-      # Google Analytics
-      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-G-BD3959F2HL}
+      # Google Analytics - od 2026-05-07 wylaczony (zastapiony przez Umami Analytics, snippet w base.html).
+      # Pozostawione zeby latwo wlaczyc GA gdyby kiedys znowu byl potrzebny - wystarczy ustawic wartosc.
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-}
 
       # Opcjonalne - domyślne wartości
       - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/app.db}

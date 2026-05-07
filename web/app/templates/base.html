@@ -11,6 +11,9 @@
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="apple-touch-icon" href="/static/favicon.ico">
 
+    <!-- Umami Analytics (cookieless, self-hosted) -->
+    <script defer src="https://t.analizy.io/script.js" data-website-id="21b7e0aa-b9b0-4105-9a0d-f84ffcaed2d0"></script>
+
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
@@ -378,7 +381,7 @@
     <!-- Cookie consent banner -->
     <div id="cookie-consent" class="cookie-consent hidden">
         <p>
-            Ta strona wykorzystuje pliki cookies w celach funkcjonalnych oraz analitycznych (Google Analytics).
+            Ta strona wykorzystuje pliki cookies w celach funkcjonalnych. Do statystyk odwiedzin używana jest analityka cookieless (Umami), nie wymagająca zgody.
             Korzystając ze strony, wyrażasz zgodę na ich użycie.
             <a href="#" onclick="pokazModal('prywatnosc'); return false;">Dowiedz się więcej</a>
         </p>
@@ -541,7 +544,8 @@
                 <p>Dane przetwarzane automatycznie:</p>
                 <ul>
                     <li><strong>Dane techniczne serwera</strong> - adres IP, typ przeglądarki, system operacyjny, data żądania. Przetwarzane w celu zapewnienia działania i bezpieczeństwa (art. 6 ust. 1 lit. f RODO).</li>
-                    <li><strong>Dane analityczne</strong> - anonimowe statystyki ruchu zbierane przez Google Analytics wyłącznie po wyrażeniu zgody (art. 6 ust. 1 lit. a RODO).</li>
+                    <li><strong>Dane analityczne (Umami)</strong> - anonimowe statystyki ruchu zbierane przez narzędzie <strong>Umami Analytics</strong> samodzielnie hostowane na serwerze administratora (UE). Cookieless — bez plików cookies i identyfikatorów śledzących. Podstawa: art. 6 ust. 1 lit. f RODO (prawnie uzasadniony interes).</li>
+                    <li><strong>Opcjonalne narzędzia analityczne (Google Analytics)</strong> - administrator zachowuje techniczną możliwość uruchomienia w przyszłości GA4. <strong>Aktualnie nieaktywne.</strong> Ewentualne włączenie wymagałoby zgody użytkownika (art. 6 ust. 1 lit. a RODO).</li>
                 </ul>
                 <p>
                     <strong>Serwis nie gromadzi metadanych konwersji</strong> - nazwy plików, nazwy firm, NIP-y ani daty konwersji nie są zapisywane.
@@ -555,21 +559,35 @@
                 <p>
                     Cookies funkcjonalne nie wymagają odrębnej zgody (art. 173 ust. 3 Prawa telekomunikacyjnego).
                 </p>
-                <p><strong>B. Cookies analityczne (Google Analytics):</strong></p>
-                <p>Instalowane <strong>wyłącznie po wyrażeniu zgody</strong> za pośrednictwem banera cookies.</p>
+                <p><strong>B. Analityka bez cookies (Umami) - aktualnie aktywna:</strong></p>
+                <p>
+                    Serwis korzysta z narzędzia <strong>Umami Analytics</strong> samodzielnie hostowanego na serwerze
+                    administratora (UE). Umami <strong>nie zapisuje plików cookies ani identyfikatorów</strong> w urządzeniu
+                    użytkownika. Statystyki generowane są na podstawie zanonimizowanego skrótu IP+User-Agent obowiązującego
+                    w obrębie jednej doby.
+                </p>
+                <p>Zakres: liczba odsłon i unikalnych odwiedzin (per dobę), strona wejścia, źródło ruchu (referer), kraj, typ urządzenia, system operacyjny, przeglądarka.</p>
+
+                <p><strong>C. Cookies analityczne (Google Analytics) - opcjonalne, aktualnie nieaktywne:</strong></p>
+                <p>
+                    Administrator zachowuje techniczną możliwość uruchomienia w przyszłości <strong>Google Analytics 4</strong>.
+                    <strong>Obecnie nieaktywne i żadne cookies GA nie są instalowane.</strong> Ewentualne włączenie wymaga zgody.
+                    W razie aktywacji instalowane mogłyby być:
+                </p>
                 <ul>
                     <li><strong>_ga</strong> - identyfikator użytkownika GA (ważność: 2 lata)</li>
                     <li><strong>_ga_*</strong> - utrzymanie stanu sesji GA (ważność: 2 lata)</li>
                 </ul>
                 <p>
-                    Google Analytics zbiera anonimowe dane statystyczne (liczba odwiedzin, lokalizacja, urządzenie, przeglądarka).
-                    Anonimizacja IP jest włączona. Usługa świadczona przez Google Ireland Limited.
+                    Po ewentualnym uruchomieniu GA zbierałby anonimowe dane statystyczne (liczba odwiedzin, lokalizacja,
+                    urządzenie, przeglądarka). Anonimizacja IP byłaby włączona. Usługa świadczona przez Google Ireland Limited.
                 </p>
 
                 <h3>4. Zarządzanie cookies</h3>
                 <ul>
                     <li>Zmiana preferencji - kliknij „Ustawienia cookies" w stopce strony</li>
-                    <li>Blokowanie GA - zainstaluj <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics Opt-out</a></li>
+                    <li>Umami nie używa cookies - można zablokować dodatkiem typu uBlock Origin lub blokadą domeny <code>t.analizy.io</code></li>
+                    <li>Na wypadek włączenia GA w przyszłości - zainstaluj <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics Opt-out</a></li>
                     <li>Ustawienia przeglądarki - zablokuj cookies w ustawieniach prywatności</li>
                 </ul>
 
@@ -578,7 +596,8 @@
                     <li><strong>Pliki po konwersji:</strong> do pobrania przez 5 minut, potem automatycznie usuwane</li>
                     <li><strong>Metadane konwersji:</strong> nie są gromadzone</li>
                     <li><strong>Logi serwera:</strong> do 30 dni</li>
-                    <li><strong>Dane Google Analytics:</strong> zgodnie z polityką Google (domyślnie 26 miesięcy)</li>
+                    <li><strong>Statystyki Umami:</strong> zanonimizowane, przechowywane w bazie administratora (UE) bezterminowo, bez identyfikatorów osobowych</li>
+                    <li><strong>Dane Google Analytics:</strong> w razie ewentualnego uruchomienia w przyszłości - zgodnie z polityką Google (domyślnie 26 miesięcy)</li>
                 </ul>
 
                 <h3>6. Prawa użytkownika</h3>
@@ -600,8 +619,10 @@
 
                 <h3>7. Udostępnianie i transfer danych</h3>
                 <p>
-                    Dane nie są sprzedawane ani udostępniane w celach marketingowych. W związku z Google Analytics
-                    dane mogą być przekazywane poza EOG - Google stosuje standardowe klauzule umowne (art. 46 ust. 2 lit. c RODO).
+                    Dane nie są sprzedawane ani udostępniane w celach marketingowych. <strong>Aktualnie żadne dane analityczne
+                    nie są przekazywane poza EOG</strong> - serwis hostowany w UE, Umami Analytics samodzielnie hostowane
+                    na serwerze administratora w UE. W razie ewentualnego uruchomienia w przyszłości Google Analytics dane
+                    mogłyby być przekazywane poza EOG - Google stosuje standardowe klauzule umowne (art. 46 ust. 2 lit. c RODO).
                 </p>
 
                 <h3>8. Zmiany polityki</h3>
