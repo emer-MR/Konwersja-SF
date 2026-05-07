@@ -1,5 +1,9 @@
 # FastAPI i serwer
 fastapi>=0.109.0
+# Starlette < 0.46: starsza sygnatura TemplateResponse(name, context). Od 0.46 wymagana
+# nowa sygnatura TemplateResponse(request, name, context) - wymagaloby przepisania ~8 wywolan
+# w app/main.py, planowane jako osobny task.
+starlette<0.46
 pydantic-settings>=2.0.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6
