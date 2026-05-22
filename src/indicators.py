@@ -1794,7 +1794,11 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
         dane.naleznosci_krotkoterminowe = bilans_dict.get("Aktywa_B_II")
         dane.naleznosci_krotkoterminowe_poprz = bilans_poprz_dict.get("Aktywa_B_II")
         dane.inwestycje_krotkoterminowe = bilans_dict.get("Aktywa_B_III")
-        dane.srodki_pieniezne = bilans_dict.get("Aktywa_B_III_c") or bilans_dict.get("Aktywa_B_III_1_c")
+        dane.srodki_pieniezne = (
+            bilans_dict.get("Aktywa_B_III_A_1") or   # środki pieniężne w kasie i na rachunkach
+            bilans_dict.get("Aktywa_B_III_c") or
+            bilans_dict.get("Aktywa_B_III_1_c")
+        )
         dane.krotkoterminowe_rmk = bilans_dict.get("Aktywa_B_IV")
 
     else:  # Inna
@@ -1884,8 +1888,41 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
                 dane.pozostale_koszty_operacyjne  # już ujemne
             )
 
-    else:  # Mała i Inna - podobna struktura
-        # Wariant porównawczy
+    elif typ_jednostki == "Mala":
+        # Jednostka Mała - RZiS 10-pozycyjny (A-J). W odróżnieniu od Jednostki
+        # Innej NIE ma osobnej pozycji "zysk z działalności operacyjnej": po
+        # poz. C (zysk ze sprzedaży) następują od razu D/E (pozostała działalność
+        # operacyjna), F/G (działalność finansowa), a zysk brutto to poz. H.
+        dane.przychody_netto_ze_sprzedazy = rzis_dict.get("A")
+        dane.koszty_dzialalnosci_operacyjnej = rzis_dict.get("B")
+        dane.wynik_ze_sprzedazy = rzis_dict.get("C")
+        dane.pozostale_przychody_operacyjne = rzis_dict.get("D")
+        dane.pozostale_koszty_operacyjne = rzis_dict.get("E")
+        dane.przychody_finansowe = rzis_dict.get("F")
+        dane.koszty_finansowe = rzis_dict.get("G")
+        dane.zysk_strata_brutto = rzis_dict.get("H")
+        dane.podatek_dochodowy = rzis_dict.get("I")
+        dane.zysk_strata_netto = rzis_dict.get("J")
+
+        # Wynik z działalności operacyjnej nie jest osobną pozycją RZiS Małej -
+        # liczymy go: zysk ze sprzedaży + pozostałe przychody operacyjne
+        # - pozostałe koszty operacyjne (kwoty kosztów są dodatnie w XML).
+        if dane.wynik_ze_sprzedazy is not None:
+            wdo = dane.wynik_ze_sprzedazy
+            if dane.pozostale_przychody_operacyjne is not None:
+                wdo += dane.pozostale_przychody_operacyjne
+            if dane.pozostale_koszty_operacyjne is not None:
+                wdo -= dane.pozostale_koszty_operacyjne
+            dane.wynik_z_dzialalnosci_operacyjnej = wdo
+
+        # Awaryjnie: zysk netto w innych wariantach (kalkulacyjny / z notą).
+        if dane.zysk_strata_netto is None:
+            dane.zysk_strata_netto = (
+                rzis_dict.get("L") or rzis_dict.get("N") or rzis_dict.get("O")
+            )
+
+    else:  # Inna - RZiS 11-pozycyjny (A-K) z osobną poz. F "zysk z działalności
+        # operacyjnej"; zysk brutto = poz. I, podatek = J, zysk netto = K.
         dane.przychody_netto_ze_sprzedazy = rzis_dict.get("A")
         dane.koszty_dzialalnosci_operacyjnej = rzis_dict.get("B")
         dane.wynik_ze_sprzedazy = rzis_dict.get("C")
@@ -1906,6 +1943,15 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
                 rzis_dict.get("O") or  # wariant kalkulacyjny z notą
                 rzis_dict.get("N")     # wariant kalkulacyjny
             )
+
+    # =========================================================================
+    # AMORTYZACJA
+    # =========================================================================
+    # Amortyzacja - pozycja B.I rachunku zysków i strat w wariancie
+    # porównawczym (dotyczy Jednostki Małej i Innej). W wariancie
+    # kalkulacyjnym amortyzacja nie jest odrębną pozycją RZiS.
+    if sprawozdanie.metadane.wariant_rzis == "porownawczy":
+        dane.amortyzacja = rzis_dict.get("B_I")
 
     # =========================================================================
     # RACHUNEK PRZEPŁYWÓW PIENIĘŻNYCH (jeśli dostępny)

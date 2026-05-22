@@ -186,6 +186,26 @@ class MultiYearConverter:
                 f"UWAGA: kilka sprawozdań dla tego samego roku ({', '.join(map(str, duplikaty))}) "
                 "- w kolumnie roku uzyto wartosci z ostatniego (najnowszy schemat)."
             )
+
+        # Kontrola rownowagi bilansowej w rozbiciu: pozycja zbiorcza kapitalu
+        # wlasnego (Pasywa A) + zobowiazania (Pasywa B) powinny dac sume
+        # bilansowa (Pasywa). Rozbieznosc oznacza blad danych zrodlowych XML.
+        for spr in self.reports:
+            pas = {p.kod: p for p in spr.bilans_pasywa}
+            razem, kap, zob = pas.get("Pasywa"), pas.get("Pasywa_A"), pas.get("Pasywa_B")
+            if not (razem and kap and zob):
+                continue
+            r, k, z = razem.kwota_biezaca, kap.kwota_biezaca, zob.kwota_biezaca
+            if r is None or k is None or z is None:
+                continue
+            roznica = float(r) - float(k) - float(z)
+            if abs(roznica) > 0.01:
+                o.append(
+                    f"UWAGA: bilans sprawozdania za {_rok(spr)} nie rownowazy sie "
+                    f"w rozbiciu - kapital wlasny + zobowiazania roznia sie od sumy "
+                    f"bilansowej o {roznica:,.2f}. Mozliwy blad danych zrodlowych "
+                    "(pozycja A. Kapital wlasny) - zweryfikuj z informacja dodatkowa."
+                )
         return o
 
     # ----------------------------------------------------------- łączenie danych

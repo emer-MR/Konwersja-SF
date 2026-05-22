@@ -2,46 +2,63 @@
 
 ## Aktualny stan
 
-**Etap:** Konwerter desktopowy (src/) - dodano tryb wsadowy "przeciągnij i upuść" z konsolidacją wieloletnią.
-**Postęp:** Funkcja drag & drop ukończona i przetestowana na prawdziwych sprawozdaniach. Aplikacja webowa (web/) bez zmian, wdrożona produkcyjnie (czytnik.analizy.io).
+**Etap:** Konwerter desktopowy (src/) - naprawa modułu analizy wskaźnikowej oraz kontrola równowagi bilansu. Tryb wsadowy i wieloletni gotowe.
+**Postęp:** Naprawiono 3 błędy ekstrakcji danych do wskaźników (dotyczyły Jednostki Małej). Konwerter wykrywa i sygnalizuje niezbilansowane sprawozdania. Zmiany w `src/` niezacommitowane.
 
 ### Co działa
-- **Konwerter desktopowy** (`src/`) - parser XML/XAdES, konwersja do XLSX, GUI tkinter, CLI (`run.py`), kalkulator wskaźników niewypłacalności (`indicators.py`)
-- **Tryb wsadowy drag & drop** - przeciągnięcie plików XML/XAdES na `Konwertuj SF.bat`:
-  - grupowanie sprawozdań po podmiocie (NIP, awaryjnie KRS, awaryjnie nazwa)
-  - 1 sprawozdanie podmiotu -> klasyczny XLSX 8-arkuszowy (`converter.py`)
-  - 2+ sprawozdania podmiotu -> jeden XLSX wieloletni z kolumnami lat (`multi_converter.py`)
-  - różne podmioty naraz -> osobny plik dla każdego
-  - wyniki w podfolderze `_Konwersja_SF` obok plików źródłowych
-  - załączniki binarne (PDF z XAdES) wypakowywane do `zalaczniki_<nazwa>/<rok>/`
-- **Konwerter wieloletni** generuje arkusze: Podsumowanie, Bilans, RZiS, Nota podatkowa, Zest. zmian w kapitale, Rach. przepływów, Analiza wskaźnikowa (wskaźniki rok po roku, kolorowane oceną), Dane surowe, Dane analityczne
-- **Aplikacja webowa** (`web/`) - FastAPI, Docker, deployment Hostinger/Mikrus
+- **Konwerter desktopowy** (`src/`) - parser XML/XAdES, konwersja do XLSX, GUI tkinter, CLI (`run.py`)
+- **Tryb wsadowy drag & drop** - przeciąganie plików XML/XAdES na `Konwertuj SF.bat`, grupowanie po podmiocie (NIP/KRS/nazwa), pojedyncze sprawozdanie -> XLSX 8-arkuszowy, 2+ -> XLSX wieloletni
+- **Analiza wskaźnikowa** - kalkulator wskaźników niewypłacalności i modeli dyskryminacyjnych; po naprawie poprawnie liczy ROA/ROS/ROE/ROp/CaR/PZN także dla Jednostki Małej (wcześniej „b/d")
+- **Kontrola równowagi bilansu** - konwerter wieloletni ostrzega, gdy Pasywa A + Pasywa B != suma bilansowa (defekt danych źródłowych)
+- **Konwerter wieloletni** - 9 arkuszy: Podsumowanie, Bilans, RZiS, Nota podatkowa, Zest. zmian w kapitale, Rach. przepływów, Analiza wskaźnikowa, Dane surowe, Dane analityczne
+- **Aplikacja webowa** (`web/`) - FastAPI, Docker, czytnik.analizy.io; używa `converter_simple.py` (bez wskaźników) - niezależna od zmian z tej sesji
 
 ### Co jest w trakcie
-- Brak aktywnych prac - tryb wsadowy zakończony i przetestowany.
+- Brak aktywnych prac - naprawa zakończona i zweryfikowana (Mała naprawiona, Inna i Mikro bez regresji).
 
 ### Następne kroki (priorytet)
-1. Testy użytkownika trybu wsadowego na własnym zbiorze sprawozdań (w toku po stronie użytkownika)
-2. Ewentualne poprawki na podstawie zgłoszeń z testów
-3. Rozważyć: rekurencyjne przeszukiwanie podfolderów przy przeciągnięciu folderu (obecnie tylko płaski poziom)
-4. Rozważyć: brak testów automatycznych (unit tests) dla całego projektu
+1. Zacommitować zmiany: `src/indicators.py`, `src/multi_converter.py` (git status: oba `M`)
+2. Rozważyć: ekstrakcja amortyzacji dla wariantu kalkulacyjnego RZiS (obecnie tylko porównawczy - poz. B.I)
+3. Rozważyć: model D. Hadasik (FD_HD) nadal pokazuje „b/d" - sprawdzić brakujące dane wejściowe
+4. Testy użytkownika trybu wsadowego na własnym zbiorze sprawozdań (z poprzedniej sesji, w toku)
+5. Rozważyć: brak testów automatycznych (unit tests) dla całego projektu
 
 ### Otwarte problemy
 - Brak testów automatycznych (unit tests).
-- Parser czyta rok kolumny z `okres_do` XML - jeśli sprawozdanie obejmuje okres nietypowy (np. EKOMEL: `2023-01-01 - 2024-12-31`), kolumna otrzymuje rok 2024. Pełny okres widoczny w arkuszu "Podsumowanie" - zachowanie poprawne, ale warte uwagi przy interpretacji.
+- Modele dyskryminacyjne w arkuszu mają wartości liczone wewnętrznie (na sztywno, nie formułami) - do opinii prawnej zaleca się przeliczenie w pliku wzorcowym Kancelarii (`modele dyskryminacyjne dla sprawozdań od 2016 roku.xlsx`).
+- Amortyzacja ekstrahowana tylko dla wariantu porównawczego RZiS; dla kalkulacyjnego pozostaje `None`.
+- Parser czyta rok kolumny z `okres_do` XML - okresy nietypowe (np. 2023-2024) trafiają do kolumny roku końcowego.
 - Przeciągnięcie wielu plików naraz ograniczone limitem długości polecenia Windows - przy dużych partiach przeciągać folder.
 
 ### Zmienione pliki w tej sesji
-- `Konwertuj SF.bat` (nowy) - plik drag & drop, wykrywa `python`/`py`, wywołuje `src/konwertuj.py`
-- `src/konwertuj.py` (nowy) - punkt wejścia dla .bat, wymusza UTF-8 na konsoli, przekazuje argv do batch
-- `src/batch.py` (nowy) - orkiestrator: zbieranie plików, grupowanie po podmiocie (`_klucz_podmiotu`), wybór konwertera, `run_batch()`
-- `src/multi_converter.py` (nowy) - klasa `MultiYearConverter`, łączenie sekcji wielu sprawozdań w kolumny lat (`_merge_section`), 9 arkuszy wynikowych
-- `README.md` - dodano sekcję o trybie wsadowym
-- `STATUS.md` (nowy) - ten plik
+- `src/indicators.py` - 3 poprawki w `extract_financial_data_from_sprawozdanie`:
+  1. RZiS Jednostki Małej (10-pozycyjny A-J) czytany był schematem Jednostki Innej (11-pozycyjny A-K) -> dodano osobną gałąź `Mala` (zysk netto = poz. J, brutto = H, podatek = I; wynik operacyjny liczony C+D-E)
+  2. Zły klucz środków pieniężnych Małej -> `Aktywa_B_III_A_1`
+  3. Pole `amortyzacja` nigdy nie wypełniane -> ekstrakcja poz. B.I RZiS (wariant porównawczy, dotyczy Małej i Innej)
+- `src/multi_converter.py` - kontrola równowagi bilansu w `_zbierz_ostrzezenia` (ostrzeżenie przy niezbilansowanym rozbiciu pasywów)
+- `korekta_kapitalu_wlasnego.py` (nowy, w folderze danych klienta `Fundacja VIS Salutis/SF-XML/`) - skrypt nakładający udokumentowaną korektę kapitału własnego na wynikowy XLSX; zapis audytowy, odtwarzalny po regeneracji
 
 ---
 
 ## Historia sesji
+
+### 2026-05-22 (sesja 2) — Naprawa modułu wskaźników + korekta SF Fundacji Vis Salutis
+- Ukończone:
+  - Test użytkownika ujawnił, że dla Jednostki Małej wskaźniki ROA/ROS/ROE/CaR/PZN pokazywały „b/d", a ROp był błędny. Diagnoza: 3 błędy w ekstraktorze danych `indicators.py`.
+  - Naprawiono błąd 1: RZiS Małej (A-J) czytany schematem liter Innej (A-K) - `zysk_strata_netto = rzis_dict.get("K")` zwracało `None`. Rozdzielono gałąź `Mala` od `Inna`.
+  - Naprawiono błąd 2: zły klucz środków pieniężnych Małej (`Aktywa_B_III_A_1`) - przywrócił CaR i poprawił wartość likwidacyjną.
+  - Naprawiono błąd 3: pole `amortyzacja` nigdy nie ustawiane - dodano ekstrakcję poz. B.I RZiS porównawczego (naprawia też PZN i modele Prusaka/Wierzby/Mączyńskiej; korzysta z tego również Jednostka Inna).
+  - Dodano kontrolę równowagi bilansu w konwerterze wieloletnim - automatycznie ostrzega o niezbilansowanych sprawozdaniach.
+  - Regeneracja XLSX dla SF Fundacji Vis Salutis 2020/2022/2024; weryfikacja na przykładach Legacy potwierdziła brak regresji dla Innej i Mikro.
+  - Nałożono udokumentowaną korektę kapitału własnego (skrypt `korekta_kapitalu_wlasnego.py`) - 14 komórek; bilans równoważy się teraz we wszystkich latach 2019-2024; wskaźniki zgadzają się z briefem QA.
+- Decyzje:
+  - Wybrano naprawę kodu konwertera + regenerację zamiast jednorazowej łatki XLSX - błąd dotyczy każdej konwersji Jednostki Małej, naprawa w kodzie służy wszystkim przyszłym konwersjom.
+  - Korekta kapitału własnego: skorygowano wyłącznie kwotę zbiorczą metodą rezydualną (Aktywa - Zobowiązania), potwierdzoną informacją dodatkową PDF. NIE sfabrykowano rozbicia A.I-A.VII - brief QA proponował A.I = 102 554,48, ale informacja dodatkowa podaje fundusz podstawowy 2 500,00 zł.
+  - Kontrola bilansu tylko sygnalizuje defekt, nie koryguje automatycznie - auto-korekta maskowałaby realne błędy danych innych podmiotów (istotne dla analizy niewypłacalności).
+  - Deploy webu (czytnik.analizy.io) NIE jest wymagany - `converter_simple.py` zależy tylko od `parser.py`/`models.py` (nietknięte); `indicators.py`/`multi_converter.py` używa wyłącznie konwerter desktopowy.
+- Problemy:
+  - Sprawozdania XML Fundacji Vis Salutis za 2022 i 2024 mają zaniżoną pozycję zbiorczą „A. Kapitał (fundusz) własny" - defekt danych źródłowych (nie konwertera); bilans nie równoważy się w rozbiciu.
+  - Nota podatkowa w SF 2020 ma niespójny zysk brutto (774 578,28 vs 240 101,50 z RZiS) - również defekt źródła.
 
 ### 2026-05-22 — Tryb wsadowy drag & drop z konsolidacją wieloletnią
 - Ukończone: nowa funkcja - przeciąganie plików XML/XAdES na `Konwertuj SF.bat`. Sprawozdania tego samego podmiotu łączone w jeden Excel z kolumnami kolejnych lat. Utworzono `multi_converter.py`, `batch.py`, `konwertuj.py`, `Konwertuj SF.bat`. Dodano sekcję do `README.md`, utworzono `STATUS.md`.
