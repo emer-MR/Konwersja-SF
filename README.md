@@ -60,22 +60,52 @@ python src/run.py folder/ -r
 python src/run.py --help
 ```
 
+### Tryb wsadowy — przeciągnij i upuść (`Konwertuj SF.bat`)
+
+Najszybszy sposób przetworzenia wielu sprawozdań: zaznacz pliki XML/XAdES
+i **przeciągnij je na ikonę `Konwertuj SF.bat`** (w katalogu głównym projektu).
+
+Działanie:
+
+- **Sprawozdania tego samego podmiotu** (rozpoznawane po NIP, a w razie braku
+  po KRS lub nazwie) trafiają do **jednego pliku Excel z kolumnami kolejnych
+  lat** — `RRRR-RRRR_analiza-wieloletnia_Nazwa.xlsx`. Umożliwia to analizę
+  porównawczą „rok obok roku". Lata bez własnego sprawozdania są odtwarzane
+  z danych porównawczych („rok poprzedni") zawartych w pozostałych plikach.
+- **Pojedyncze sprawozdanie** podmiotu → klasyczny plik 8-arkuszowy.
+- **Różne podmioty naraz** → osobny plik dla każdego.
+- **Załączniki** binarne (PDF z XAdES) są wypakowywane do podfolderów rocznych.
+
+Pliki wynikowe zapisywane są w podfolderze **`_Konwersja_SF`** obok plików
+źródłowych. Można też przeciągnąć cały folder (brane są pliki z jego
+płaskiego poziomu, bez podfolderów).
+
+Arkusze pliku wieloletniego: Podsumowanie, Bilans, RZiS, Nota podatkowa,
+Zest. zmian w kapitale, Rach. przepływów, Analiza wskaźnikowa (wskaźniki
+niewypłacalności rok po roku, kolorowane oceną), Dane surowe, Dane analityczne.
+
 ## Struktura projektu
 
 ```
 Konwersja-SF/
+├── Konwertuj SF.bat      # Tryb wsadowy — przeciągnij i upuść
 ├── src/
-│   ├── run.py           # Punkt wejścia (GUI/CLI)
-│   ├── gui.py           # Interfejs graficzny (tkinter)
-│   ├── parser.py        # Parser XML sprawozdań
-│   ├── converter.py     # Konwerter do XLSX
-│   ├── models.py        # Struktury danych
-│   ├── mappings.py      # Mapowania kodów → opisy polskie
-│   └── requirements.txt # Zależności
+│   ├── run.py            # Punkt wejścia (GUI/CLI)
+│   ├── konwertuj.py      # Punkt wejścia trybu wsadowego (dla .bat)
+│   ├── batch.py          # Orkiestrator wsadowy (grupowanie po podmiocie)
+│   ├── multi_converter.py # Konwerter wieloletni (kolumny lat)
+│   ├── gui.py            # Interfejs graficzny (tkinter)
+│   ├── parser.py         # Parser XML sprawozdań
+│   ├── converter.py      # Konwerter do XLSX (pojedyncze sprawozdanie)
+│   ├── models.py         # Struktury danych
+│   ├── mappings.py       # Mapowania kodów → opisy polskie
+│   ├── indicators.py     # Kalkulator wskaźników niewypłacalności
+│   └── requirements.txt  # Zależności
 ├── docs/
 │   └── struktura_xlsx.md
-├── CLAUDE.md            # Instrukcje dla Claude Code
+├── CLAUDE.md             # Instrukcje dla Claude Code
 ├── PLAN_IMPLEMENTACJI.md
+├── STATUS.md             # Stan prac między sesjami
 └── README.md
 ```
 
