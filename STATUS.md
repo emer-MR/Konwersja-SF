@@ -2,45 +2,62 @@
 
 ## Aktualny stan
 
-**Etap:** Konwerter desktopowy (src/) - naprawa modułu analizy wskaźnikowej oraz kontrola równowagi bilansu. Tryb wsadowy i wieloletni gotowe.
-**Postęp:** Naprawiono 3 błędy ekstrakcji danych do wskaźników (dotyczyły Jednostki Małej). Konwerter wykrywa i sygnalizuje niezbilansowane sprawozdania. Zmiany w `src/` niezacommitowane.
+**Etap:** Środowisko uruchomieniowe na Linuksie (Ubuntu 26.04) + aktualizacja dokumentacji. Kod konwertera bez zmian.
+**Postęp:** Repozytorium sklonowane na maszynę linuksową, oba komponenty (desktop i web) uruchamiają się z lokalnych środowisk `uv`. README i `web/README.md` opisują ścieżkę linuksową. Brak zmian w logice konwersji.
 
 ### Co działa
-- **Konwerter desktopowy** (`src/`) - parser XML/XAdES, konwersja do XLSX, GUI tkinter, CLI (`run.py`)
-- **Tryb wsadowy drag & drop** - przeciąganie plików XML/XAdES na `Konwertuj SF.bat`, grupowanie po podmiocie (NIP/KRS/nazwa), pojedyncze sprawozdanie -> XLSX 8-arkuszowy, 2+ -> XLSX wieloletni
-- **Analiza wskaźnikowa** - kalkulator wskaźników niewypłacalności i modeli dyskryminacyjnych; po naprawie poprawnie liczy ROA/ROS/ROE/ROp/CaR/PZN także dla Jednostki Małej (wcześniej „b/d")
-- **Kontrola równowagi bilansu** - konwerter wieloletni ostrzega, gdy Pasywa A + Pasywa B != suma bilansowa (defekt danych źródłowych)
+- **Konwerter desktopowy** (`src/`) - parser XML/XAdES, konwersja do XLSX, GUI tkinter, CLI (`run.py`); wszystkie moduły importują się bez błędu na Pythonie 3.13
+- **Tryb wsadowy** - `src/konwertuj.py` przyjmuje ścieżki z wiersza poleceń; grupowanie po podmiocie (NIP/KRS/nazwa), pojedyncze sprawozdanie -> XLSX 8-arkuszowy, 2+ -> XLSX wieloletni
+- **Analiza wskaźnikowa** - kalkulator wskaźników niewypłacalności i modeli dyskryminacyjnych (poprawki dla Jednostki Małej w commicie `8e80b41`)
+- **Kontrola równowagi bilansu** - konwerter wieloletni ostrzega, gdy Pasywa A + Pasywa B != suma bilansowa
 - **Konwerter wieloletni** - 9 arkuszy: Podsumowanie, Bilans, RZiS, Nota podatkowa, Zest. zmian w kapitale, Rach. przepływów, Analiza wskaźnikowa, Dane surowe, Dane analityczne
-- **Aplikacja webowa** (`web/`) - FastAPI, Docker, czytnik.analizy.io; używa `converter_simple.py` (bez wskaźników) - niezależna od zmian z tej sesji
+- **Aplikacja webowa** (`web/`) - FastAPI startuje lokalnie, `GET /` zwraca 200, baza SQLite tworzy się automatycznie; używa `converter_simple.py` (bez wskaźników)
+- **Uruchamianie na Linuksie** - `./start.sh` (GUI/CLI) oraz pozycja w menu KDE
 
 ### Co jest w trakcie
-- Brak aktywnych prac - naprawa zakończona i zweryfikowana (Mała naprawiona, Inna i Mikro bez regresji).
+- Brak aktywnych prac. Środowisko przygotowane, dokumentacja spisana.
 
 ### Następne kroki (priorytet)
-1. Zacommitować zmiany: `src/indicators.py`, `src/multi_converter.py` (git status: oba `M`)
+1. Test konwersji na realnym pliku XML na maszynie linuksowej - klon nie zawiera przykładów (`Przykłady konwersji/`, `Przykłady sprawozdań/` są w `.gitignore`), więc ścieżka XML -> XLSX nie została jeszcze przejechana end-to-end na tym systemie
 2. Rozważyć: ekstrakcja amortyzacji dla wariantu kalkulacyjnego RZiS (obecnie tylko porównawczy - poz. B.I)
 3. Rozważyć: model D. Hadasik (FD_HD) nadal pokazuje „b/d" - sprawdzić brakujące dane wejściowe
-4. Testy użytkownika trybu wsadowego na własnym zbiorze sprawozdań (z poprzedniej sesji, w toku)
-5. Rozważyć: brak testów automatycznych (unit tests) dla całego projektu
+4. Rozważyć: brak testów automatycznych (unit tests) dla całego projektu
+5. Rozważyć aktualizację `CLAUDE.md` w repo - opisuje projekt jako zbiór schematów XSD („data structure project, not a software project"), co jest nieaktualne od czasu powstania `src/` i `web/`
 
 ### Otwarte problemy
 - Brak testów automatycznych (unit tests).
+- `CLAUDE.md` w repo opisuje nieistniejącą już strukturę projektu (katalogi XSD zamiast kodu).
 - Modele dyskryminacyjne w arkuszu mają wartości liczone wewnętrznie (na sztywno, nie formułami) - do opinii prawnej zaleca się przeliczenie w pliku wzorcowym Kancelarii (`modele dyskryminacyjne dla sprawozdań od 2016 roku.xlsx`).
 - Amortyzacja ekstrahowana tylko dla wariantu porównawczego RZiS; dla kalkulacyjnego pozostaje `None`.
 - Parser czyta rok kolumny z `okres_do` XML - okresy nietypowe (np. 2023-2024) trafiają do kolumny roku końcowego.
 - Przeciągnięcie wielu plików naraz ograniczone limitem długości polecenia Windows - przy dużych partiach przeciągać folder.
+- `Konwertuj SF.bat` działa wyłącznie na Windowsie; na Linuksie odpowiednikiem jest wywołanie `src/konwertuj.py` z listą ścieżek (drag & drop pod KDE świadomie nieodwzorowany).
 
 ### Zmienione pliki w tej sesji
-- `src/indicators.py` - 3 poprawki w `extract_financial_data_from_sprawozdanie`:
-  1. RZiS Jednostki Małej (10-pozycyjny A-J) czytany był schematem Jednostki Innej (11-pozycyjny A-K) -> dodano osobną gałąź `Mala` (zysk netto = poz. J, brutto = H, podatek = I; wynik operacyjny liczony C+D-E)
-  2. Zły klucz środków pieniężnych Małej -> `Aktywa_B_III_A_1`
-  3. Pole `amortyzacja` nigdy nie wypełniane -> ekstrakcja poz. B.I RZiS (wariant porównawczy, dotyczy Małej i Innej)
-- `src/multi_converter.py` - kontrola równowagi bilansu w `_zbierz_ostrzezenia` (ostrzeżenie przy niezbilansowanym rozbiciu pasywów)
-- `korekta_kapitalu_wlasnego.py` (nowy, w folderze danych klienta `Fundacja VIS Salutis/SF-XML/`) - skrypt nakładający udokumentowaną korektę kapitału własnego na wynikowy XLSX; zapis audytowy, odtwarzalny po regeneracji
+- `start.sh` (nowy) - uruchamia `src/run.py` przez `.venv`, sam wykrywa katalog repo, przekazuje argumenty do CLI, czytelny błąd gdy brak `.venv`
+- `README.md` - sekcja „Instalacja na Linuksie" (uv, powód: brak `pip`/`tkinter`), opis `start.sh`, równoważnik trybu wsadowego na Linuksie, `start.sh` w drzewie projektu
+- `web/README.md` - wariant uruchomienia lokalnego przez `uv` w odrębnym środowisku (pin `starlette<0.46`)
+- Poza repo (środowisko lokalne, nieśledzone): `.venv/`, `web/.venv/`, `web/.env`, `~/.local/share/applications/konwersja-sf.desktop`
 
 ---
 
 ## Historia sesji
+
+### 2026-09-07 — Klon na Linuksa, środowiska uv, skróty uruchamiania
+- Ukończone:
+  - Sklonowano repo do `~/repos/konwersja-sf` (HEAD `8e80b41`, zgodny z `origin/main`).
+  - Utworzono dwa środowiska `uv` z Pythonem 3.13: `.venv` (lxml, openpyxl) dla `src/` oraz `web/.venv` (FastAPI, starlette 0.45.3) dla `web/`.
+  - Zweryfikowano: `src/run.py --help` działa, wszystkie 9 modułów `src/` importuje się bez błędu, tkinter tworzy okno (XWayland), serwer web zwraca 200 na `GET /` i zakłada bazę SQLite.
+  - Utworzono `web/.env` z `.env.example` (własny `SECRET_KEY`, `DEBUG=true`, `RECAPTCHA_ENABLED=false`).
+  - Dodano `start.sh` oraz wpis menu KDE `~/.local/share/applications/konwersja-sf.desktop` (walidacja `desktop-file-validate` OK).
+  - Zaktualizowano `README.md` i `web/README.md` o ścieżkę linuksową.
+- Decyzje:
+  - **`uv` zamiast `pip`** - systemowy Python 3.14 w Ubuntu 26.04 nie ma modułu `pip` ani `tkinter`, więc instrukcja z README nie zadziała, a GUI nie wystartuje. Python pobierany przez `uv` ma tkinter wbudowany, co omija `sudo apt install python3-tk`.
+  - **Dwa osobne środowiska zamiast jednego** - web pinuje `starlette<0.46`; trzymanie tego pinu z dala od konwertera desktopowego zapobiega przypadkowemu wiązaniu wersji.
+  - **Nie odwzorowano drag & drop pod KDE** (service menu Dolphina) - Michał uznał wywołanie `src/konwertuj.py` z listą ścieżek za wystarczające.
+  - **Nie przepisano `CLAUDE.md`** mimo nieaktualności - poza zakresem tej sesji, zgłoszone jako otwarty problem.
+- Problemy:
+  - Konwersji nie przetestowano na realnym pliku - klon nie zawiera żadnego XML-a (katalogi z przykładami są w `.gitignore`). Weryfikacja ograniczyła się do importów, uruchomienia CLI i startu serwera.
 
 ### 2026-05-22 (sesja 2) — Naprawa modułu wskaźników + korekta SF Fundacji Vis Salutis
 - Ukończone:

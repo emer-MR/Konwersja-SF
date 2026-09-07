@@ -30,6 +30,16 @@ pip install -r requirements.txt
 python run_local.py
 ```
 
+Na Linuksie z Pythonem bez `pip` (np. Ubuntu 26.04) - przez `uv`, w środowisku
+odrębnym od konwertera desktopowego, bo web pinuje `starlette<0.46`:
+
+```bash
+cd web
+uv venv --python 3.13 .venv
+VIRTUAL_ENV=$PWD/.venv uv pip install -r requirements.txt
+.venv/bin/python run_local.py
+```
+
 Lub bezpośrednio:
 ```bash
 uvicorn app.main:app --reload --port 8000

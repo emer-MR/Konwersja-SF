@@ -27,9 +27,23 @@ pip install -r src/requirements.txt
 ```
 
 ### Wymagania
-- Python 3.10+
+- Python 3.10+ z modułem `tkinter` (wymagany przez GUI)
 - lxml >= 4.9.0
 - openpyxl >= 3.1.0
+
+### Instalacja na Linuksie
+
+Dystrybucyjny Python bywa pozbawiony `pip` i `tkinter` (tak jest np. w Ubuntu 26.04
+z Pythonem 3.14), przez co powyższe `pip install` nie zadziała, a GUI nie wystartuje.
+Najpewniejsza droga prowadzi wtedy przez [`uv`](https://docs.astral.sh/uv/), który
+pobiera własnego Pythona z wbudowanym `tkinter`:
+
+```bash
+uv venv --python 3.13 .venv
+VIRTUAL_ENV=$PWD/.venv uv pip install -r src/requirements.txt
+```
+
+Alternatywnie, na Pythonie systemowym: `sudo apt install python3-pip python3-tk`.
 
 ## Użycie
 
@@ -43,6 +57,18 @@ Lub bezpośrednio:
 ```bash
 python src/gui.py
 ```
+
+Na Linuksie wygodniejszy jest skrypt `start.sh` z katalogu głównego - sam odnajduje
+`.venv` i działa niezależnie od bieżącego katalogu roboczego:
+
+```bash
+./start.sh                       # GUI
+./start.sh sprawozdanie.xml      # argumenty przekazywane do CLI (src/run.py)
+```
+
+Skrypt nadaje się też na pozycję w menu pulpitu (plik `.desktop` z `Exec=` wskazującym
+na `start.sh`) - wtedy konwerter uruchamia się kliknięciem, jak `Konwertuj SF.bat`
+na Windowsie.
 
 ### Wiersz poleceń (CLI)
 
@@ -84,11 +110,23 @@ Arkusze pliku wieloletniego: Podsumowanie, Bilans, RZiS, Nota podatkowa,
 Zest. zmian w kapitale, Rach. przepływów, Analiza wskaźnikowa (wskaźniki
 niewypłacalności rok po roku, kolorowane oceną), Dane surowe, Dane analityczne.
 
+**Na Linuksie** plik `.bat` nie działa (to skrypt cmd.exe), ale sam mechanizm wsadowy
+jest przenośny - `.bat` tylko przekazuje ścieżki do `src/konwertuj.py`. Równoważne
+wywołanie:
+
+```bash
+python src/konwertuj.py sprawozdanie_2022.xml sprawozdanie_2023.xml
+python src/konwertuj.py folder-ze-sprawozdaniami/
+```
+
+Grupowanie po podmiocie, plik wieloletni i podfolder `_Konwersja_SF` działają tak samo.
+
 ## Struktura projektu
 
 ```
 Konwersja-SF/
-├── Konwertuj SF.bat      # Tryb wsadowy — przeciągnij i upuść
+├── Konwertuj SF.bat      # Tryb wsadowy — przeciągnij i upuść (Windows)
+├── start.sh              # Uruchamianie przez .venv (Linux/macOS)
 ├── src/
 │   ├── run.py            # Punkt wejścia (GUI/CLI)
 │   ├── konwertuj.py      # Punkt wejścia trybu wsadowego (dla .bat)
