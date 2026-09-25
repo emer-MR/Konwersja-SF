@@ -14,12 +14,12 @@
 - **Aplikacja webowa** (`web/`, https://czytnik.analizy.io, kontener `czytnik-sf` na VPS Hostinger) - wersje zależności przypięte w `web/requirements.txt`; procedura deployu i kontroli po deployu w `web/CLAUDE.md`
 
 ### Co jest w trakcie
-- Brak rozpoczętych prac. Pozostałe ustalenia przeglądu (I2, I3, I6, I7, I8, I10, I11) - w następnych krokach.
+- Brak rozpoczętych prac. Pozostałe ustalenia przeglądu (I2, I3, I8, I10, I11) - w następnych krokach.
 
 ### Następne kroki (priorytet)
 1. **Smoke test webu po deployu:** przepuścić jeden XML przez czytnik.analizy.io i raz zalogować się do panelu admina (nowe wersje pakietów, m.in. `bcrypt` 5.0 - dotąd sprawdzony tylko start aplikacji, `GET /` i `/docs`)
-2. **I7:** zweryfikować definicje zmiennych modeli Gajdki-Stosa (znak przy X2, X4 = zysk brutto?), Mączyńskiej (X1 = zysk brutto + amortyzacja?), Prusaka 1r/2l (strefy szare), Hadasik (X7) w źródłach z vaultu Wiedza (`Prawo/Niewypłacalność/04-Modele/`) - dopiero potem poprawiać kod
-3. **I6:** Altman - wersja Z' (1983) dla spółek nienotowanych (0,717/0,847/3,107/0,420/0,998, progi 1,23/2,90) zamiast współczynników 1968; zysk zatrzymany = Pasywa_A_V + A_VI
+2. ~~I7, I6~~ - zrobione 2026-09-25 (sesja 2, `a464e4a`): Gajdka-Stos, Mączyńska, Altman Z', próg Hadasik - patrz historia
+3. Instrukcje `.doc/.docx` w `DIR\Biegły\Wzory opinii\...` nadal opisują Altmana 1968 i dawne definicje modeli - zaktualizować przy okazji (szablony xlsx/xls już poprawione)
 4. **I2:** rozbieżności dane porównawcze vs SF roku poprzedniego -> lista w arkuszu Podsumowanie; obsługa `KwotaB1` (przekształcone)
 5. **I3:** dwa SF za jeden rok kalendarzowy (np. otwarcie likwidacji) - klucz kolumny = okres, sortowanie po `data_sporzadzenia`, cykle skalowane do długości okresu
 6. **I10 / I11 / I8:** przeliczanie WTysiacach w konsolidacji; `raise` dla JednostkaOp i innych nieobsługiwanych typów; Inna bez `Pasywa_B_II` -> ZD = 0 (model poznański b/d)
@@ -47,6 +47,21 @@
 ---
 
 ## Historia sesji
+
+### 2026-09-25 (sesja 2) — Weryfikacja wzorów modeli dyskryminacyjnych ze źródłami
+- Ukończone:
+  - Porównanie kod ↔ arkusz wzorcowy kancelarii (`DIR\Biegły\modele dyskryminacyjne dla sprawozdań od 2016 roku.xlsx`) ↔ vault Wiedza (`Prawo/Niewypłacalność/04-Modele/`) ↔ literatura (UZ K. Mazur, UE Wrocław nr 98, gazeta-msp).
+  - `indicators.py` (`a464e4a`):
+    - **Gajdka-Stos** = +0,0007747·X2, X4 = zysk brutto / PS, X2 = śr. ZK × 365 / koszt wytworzenia, X1/X3 na śr. aktywach (było: minus, netto, 360, stany końcowe);
+    - **Mączyńska** X1 = (zysk brutto + amortyzacja)/ZO (było: netto);
+    - **Altman → Z' (1983)** 0,717/0,847/3,107/0,420/0,998, progi 1,23/2,90, zysk zatrzymany = A.V + A.VI (Mikro: KW - kapitał podstawowy; pole `zysk_zatrzymany` wcześniej nigdy nieustawiane);
+    - **Hadasik** próg -0,42895 (było 0) + uwaga o wielu wersjach modelu w literaturze.
+  - `converter.py`: objaśnienia wzorów w arkuszu wskaźników zgodne z kodem. Test: Strefa 2019 ręcznie FD_GS -1,172 = arkusz -1,17; Z' -2,704 = -2,70.
+  - Poza repo (agent, Excel COM): 11 szablonów xlsx/xls w `DIR\Biegły` (arkusz wzorcowy, `Wzory opinii\Modele dyskryminacyjne w Excelu`, `Wzory opinii\Analiza finansowa w Excelu`) + 2 zipy. Błędy: Hadasik - odwołania komórek (X1/X2 przez należności, X5 z ZK, X6/X7 mnożone przez X5); Altman - X4 = KW/aktywa, EBIT z odsetkami otrzymanymi, przychody z układu 2015; Gajdka-Stos; Mączyńska - zysk brutto z wiersza rezerw; Hołda - średnie z niewłaściwych wierszy, koszt wytworzenia; amortyzacja Wierzba/Prusak. 426 sprawdzeń / 0 błędów; oryginały w `DIR\Biegły\_archiwum przed poprawką modeli 2026-09-25\`.
+- Decyzje:
+  - **Złożonych opinii i plików roboczych spraw nie poprawiamy** (decyzja biegłego) - naprawiamy narzędzia na przyszłość.
+  - Hadasik: zostaje wersja z arkusza wzorcowego (0,335969…, 2,59323) z progiem z tego samego źródła (-0,42895) - w literaturze są co najmniej 3 wersje; nie mieszać współczynników i progów.
+  - Altman: dla sp. z o.o. wyłącznie Z' (brak wartości rynkowej kapitału).
 
 ### 2026-09-25 — Przegląd poprawności wskaźników, poprawki mapowań, awaria i naprawa webu
 - Ukończone:
