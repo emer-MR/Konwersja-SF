@@ -37,6 +37,21 @@
   `docker ps --filter name=czytnik-sf` (musi być `healthy`, nie `Restarting`),
   `docker logs --tail 20 czytnik-sf`, `curl -s -o /dev/null -w "%{http_code}" https://czytnik.analizy.io/` (200).
 
+## Smoke test po deployu (bez dotykania produkcji)
+`web/tests/smoke_test.py` - uruchamiany w **tymczasowym kontenerze** z obrazu `web-web:latest`
+(osobna baza w `/tmp`, reCAPTCHA wyłączona, brak sieci; wolumen produkcyjny tylko do odczytu -
+sprawdza, czy bcrypt czyta istniejące hashe). Sprawdza: strony publiczne, konwersję każdego
+`*.xml` z `/tmp/smoke/`, pobranie XLSX, błędny XML → komunikat, logowanie admina (złe/dobre hasło), `/admin`.
+Z Windowsa (katalog z `smoke_test.py` i kilkoma próbkami XML):
+```bash
+cd <katalog> && tar -cf - *.xml smoke_test.py | ssh -o StrictHostKeyChecking=no -i ~/.ssh/hostinger_vps root@72.62.1.15 \
+  "docker run --rm -i --network none -e DATABASE_URL=sqlite+aiosqlite:////tmp/smoke.db -e RECAPTCHA_ENABLED=false \
+   -e SECRET_KEY=smoke-test -e ADMIN_FILE_RETENTION_DAYS=0 -v web_czytnik_data:/prod:ro --entrypoint sh web-web:latest \
+   -c 'mkdir -p /tmp/smoke && cd /tmp/smoke && tar -xf - && mv smoke_test.py smoke.py && cd /app && python /tmp/smoke/smoke.py'"
+```
+Oczekiwany wynik: `WYNIK: WSZYSTKO OK` (2026-09-25: 17/17). Próbki XML nie są w repo (dane klientów) -
+brać z `[Legacy]\...\Przykłady sprawozdań` lub z folderu sprawy; dla formatu 2025 (`Dokument`) dołączyć SF za 2025.
+
 ## Zależności - wersje przypięte (od 2026-09-25)
 - `requirements.txt` ma **dokładne wersje** (`==`), zdjęte `pip freeze` z działającego obrazu.
   Powód: przy samych `>=` przebudowa obrazu 2026-09-25 wciągnęła SQLAlchemy 2.1.0, które nie
