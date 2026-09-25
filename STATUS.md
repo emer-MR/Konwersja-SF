@@ -2,34 +2,74 @@
 
 ## Aktualny stan
 
-**Etap:** Środowisko uruchomieniowe na Linuksie (Ubuntu 26.04) + aktualizacja dokumentacji. Kod konwertera bez zmian.
-**Postęp:** Repozytorium sklonowane na maszynę linuksową, oba komponenty (desktop i web) uruchamiają się z lokalnych środowisk `uv`. README i `web/README.md` opisują ścieżkę linuksową. Brak zmian w logice konwersji.
+**Etap:** Po przeglądzie poprawności wskaźników i mapowań (2026-09-25) - kod konwertera poprawiony, web wdrożony z przypiętymi zależnościami.
+**Postęp:** Mapowanie RZiS wszystkich typów i wariantów zgodne z XSD (tabela `RZIS_MAP`), kontrola spójności RZiS w arkuszu, poprawione WPZ (art. 11 ust. 5), CaR Innej, konsolidacja wieloletnia przy zmianie typu jednostki, grupowanie podmiotów. Regresja: 29 próbek Legacy + 5 XML mikro. czytnik.analizy.io działa na `44d453c` (healthy, 200).
 
 ### Co działa
-- **Konwerter desktopowy** (`src/`) - parser XML/XAdES, konwersja do XLSX, GUI tkinter, CLI (`run.py`); wszystkie moduły importują się bez błędu na Pythonie 3.13
-- **Tryb wsadowy** - `src/konwertuj.py` przyjmuje ścieżki z wiersza poleceń; grupowanie po podmiocie (NIP/KRS/nazwa), pojedyncze sprawozdanie -> XLSX 8-arkuszowy, 2+ -> XLSX wieloletni
-- **Analiza wskaźnikowa** - kalkulator wskaźników niewypłacalności i modeli dyskryminacyjnych (poprawki dla Jednostki Małej w commicie `8e80b41`)
-- **Kontrola równowagi bilansu** - konwerter wieloletni ostrzega, gdy Pasywa A + Pasywa B != suma bilansowa
-- **Konwerter wieloletni** - 9 arkuszy: Podsumowanie, Bilans, RZiS, Nota podatkowa, Zest. zmian w kapitale, Rach. przepływów, Analiza wskaźnikowa, Dane surowe, Dane analityczne
-- **Aplikacja webowa** (`web/`) - FastAPI startuje lokalnie, `GET /` zwraca 200, baza SQLite tworzy się automatycznie; używa `converter_simple.py` (bez wskaźników)
-- **Uruchamianie na Linuksie** - `./start.sh` (GUI/CLI) oraz pozycja w menu KDE
+- **Konwerter desktopowy** (`src/`, `Konwertuj SF.bat` / `src/konwertuj.py`) - pojedyncze SF -> XLSX 8-arkuszowy, 2+ SF podmiotu -> XLSX wieloletni; grupowanie union-find po NIP/KRS (także schemat 1-0 z KRS w elemencie potomnym) i znormalizowanej nazwie
+- **Mapowanie RZiS** - Mikro (A - |B| + C - |D| - E = F), Mała i Inna w wariantach porównawczym i kalkulacyjnym wg XSD 1-0/1-2/1-3 (`indicators.py: RZIS_MAP`)
+- **Kontrola spójności RZiS** - rozbieżność > 1 zł -> sekcja „UWAGI DO DANYCH” w arkuszu Analiza wskaźnikowa (czerwone)
+- **Wskaźniki i modele** - przy KW < 0 pozytywne wyniki modeli FD_* oznaczane jako ostrzegawcze; WZD/CKG/CZob bez fałszywych ocen „optymalna” (Mikro = b/d); WPZ z ostrożnymi komunikatami (art. 11 ust. 4 i 5 p.u.)
+- **Konsolidacja wieloletnia** - przy mieszanych typach jednostki / wariantach RZiS osobne bloki „BLOK: ...” zamiast mieszania wierszy po kodzie
+- **Aplikacja webowa** (`web/`, https://czytnik.analizy.io, kontener `czytnik-sf` na VPS Hostinger) - wersje zależności przypięte w `web/requirements.txt`; procedura deployu i kontroli po deployu w `web/CLAUDE.md`
 
 ### Co jest w trakcie
-- Brak aktywnych prac. Środowisko przygotowane, dokumentacja spisana.
+- Brak rozpoczętych prac. Pozostałe ustalenia przeglądu (I2, I3, I6, I7, I8, I10, I11) - w następnych krokach.
 
 ### Następne kroki (priorytet)
-1. Test konwersji na realnym pliku XML na maszynie linuksowej - klon nie zawiera przykładów (`Przykłady konwersji/`, `Przykłady sprawozdań/` są w `.gitignore`), więc ścieżka XML -> XLSX nie została jeszcze przejechana end-to-end na tym systemie
-2. Rozważyć: ekstrakcja amortyzacji dla wariantu kalkulacyjnego RZiS (obecnie tylko porównawczy - poz. B.I)
-3. Rozważyć: model D. Hadasik (FD_HD) nadal pokazuje „b/d" - sprawdzić brakujące dane wejściowe
-4. Rozważyć: brak testów automatycznych (unit tests) dla całego projektu
-5. Rozważyć aktualizację `CLAUDE.md` w repo - opisuje projekt jako zbiór schematów XSD („data structure project, not a software project"), co jest nieaktualne od czasu powstania `src/` i `web/`
+1. **Smoke test webu po deployu:** przepuścić jeden XML przez czytnik.analizy.io i raz zalogować się do panelu admina (nowe wersje pakietów, m.in. `bcrypt` 5.0 - dotąd sprawdzony tylko start aplikacji, `GET /` i `/docs`)
+2. **I7:** zweryfikować definicje zmiennych modeli Gajdki-Stosa (znak przy X2, X4 = zysk brutto?), Mączyńskiej (X1 = zysk brutto + amortyzacja?), Prusaka 1r/2l (strefy szare), Hadasik (X7) w źródłach z vaultu Wiedza (`Prawo/Niewypłacalność/04-Modele/`) - dopiero potem poprawiać kod
+3. **I6:** Altman - wersja Z' (1983) dla spółek nienotowanych (0,717/0,847/3,107/0,420/0,998, progi 1,23/2,90) zamiast współczynników 1968; zysk zatrzymany = Pasywa_A_V + A_VI
+4. **I2:** rozbieżności dane porównawcze vs SF roku poprzedniego -> lista w arkuszu Podsumowanie; obsługa `KwotaB1` (przekształcone)
+5. **I3:** dwa SF za jeden rok kalendarzowy (np. otwarcie likwidacji) - klucz kolumny = okres, sortowanie po `data_sporzadzenia`, cykle skalowane do długości okresu
+6. **I10 / I11 / I8:** przeliczanie WTysiacach w konsolidacji; `raise` dla JednostkaOp i innych nieobsługiwanych typów; Inna bez `Pasywa_B_II` -> ZD = 0 (model poznański b/d)
+7. Testy automatyczne - regresja na próbkach z `[Legacy]\...\Przykłady konwersji` jako pytest (skrypty z sesji 2026-09-25 były jednorazowe, w scratchpadzie)
 
-### Poprawka 2026-09-25 - znak kosztów w RZiS Jednostki Mikro
+### Otwarte problemy
+- **Arkusze wygenerowane przed 2026-09-25 są niewiarygodne** dla: Mikro (wynik ze sprzedaży, modele), Innej (zysk netto przy poz. K, CaR, WPZ), wariantów kalkulacyjnych, WPZ wszystkich typów, konsolidacji z mieszanymi typami - przegenerować przed użyciem w opinii.
+- Brak testów automatycznych (unit tests).
+- `CLAUDE.md` w repo (główny) opisuje nieistniejącą już strukturę projektu (katalogi XSD zamiast kodu).
+- `src/mappings_generated.py` nie kompiluje się (literalne `\n`) - moduł nieimportowany, stan od pierwszego commita.
+- Modele dyskryminacyjne w arkuszu liczone wewnętrznie (nie formułami) - do opinii prawnej przeliczać w pliku wzorcowym kancelarii.
+- Limit ścieżki 260 znaków w Windows: przy bardzo długich ścieżkach OneDrive + długich nazwach spółek zapis XLSX może paść z Errno 2 (nie regresja).
+- W katalogu nadrzędnym `01 Analiza SF/` leży `20260214/` - stara kopia `src/` poza gitem (z błędem znaku Mikro); do archiwizacji/usunięcia decyzją użytkownika.
+
+### Zmienione pliki w tej sesji
+- `src/indicators.py` - `RZIS_MAP`, przepisane `extract_financial_data_from_sprawozdanie` (znak kosztów Mikro, mapowanie Mała/Inna × porównawczy/kalkulacyjny, środki pieniężne Innej, zob. wobec powiązanych, zob. handlowe, kontrola spójności -> `uwagi`), `_oznacz_modele_przy_ujemnym_kapitale`, `_oblicz_wskaznik_art_11_ust_5`, `_oblicz_zadluzenie_dlugoterminowe`, cykle (`_zobowiazania_do_cyklu`, `_format_dni`), Wilcox-Gambler Mikro
+- `src/converter.py` - sekcja „UWAGI DO DANYCH” w arkuszu wskaźników, zaktualizowane objaśnienia
+- `src/multi_converter.py` - segmenty (typ, wariant) w `_merge_section`, bloki „BLOK: ...”, uwagi scalane po latach
+- `src/parser.py` - KRS/NIP z elementów potomnych (schemat 1-0)
+- `src/batch.py` - `_normalizuj_nazwe`, `_grupuj_podmioty` (union-find)
+- `web/requirements.txt` - `sqlalchemy[asyncio]`, jawny `greenlet`, wszystkie wersje przypięte `==`
+- `web/CLAUDE.md` - deploy: pełna komenda SSH, lokalna zmiana compose na VPS, obowiązkowa kontrola po deployu, sekcja o przypiętych zależnościach
+- `STATUS.md` - ten plik
+
+---
+
+## Historia sesji
+
+### 2026-09-25 — Przegląd poprawności wskaźników, poprawki mapowań, awaria i naprawa webu
+- Ukończone:
+  - Błąd znaku kosztów Mikro wykryty przy opinii biegłego (arkusz dawał ROp +226% i dodatnie modele u spółki ze stratami) - poprawka `02176e6`.
+  - Pełny przegląd kodu (agent, 20+ próbek XML Mikro/Mała/Inna, oba warianty RZiS, XSD 1-0/1-2/1-3) - 6 błędów krytycznych (K1-K6) i 11 istotnych (I1-I11); wdrożone K1-K6, I1, I4, I5 (`b006bd1`), regresja przed/po na 34 plikach, tryb wsadowy 16 podmiotów / 0 błędów.
+  - Deploy webu (`b006bd1`) -> kontener w pętli restartów (SQLAlchemy 2.1.0 bez `greenlet`), strona 404; diagnoza z logów, weryfikacja poprawki na zbudowanym obrazie w tymczasowym kontenerze, `0b2bf40` (`sqlalchemy[asyncio]`) + `44d453c` (przypięcie wszystkich wersji); strona przywrócona (healthy, `GET /` 200).
+- Decyzje:
+  - **Jedna tabela mapowania `RZIS_MAP` (typ, wariant)** zamiast rozgałęzień if/elif - poprzednie błędy (Mała w `8e80b41`, Mikro, Inna, kalkulacyjny) brały się z ręcznego przepisywania liter pozycji; tabela jest sprawdzalna wprost z XSD.
+  - **Kontrola spójności RZiS jako uwaga w arkuszu, nie wyjątek** - defekty danych źródłowych (np. SF Fundacji Vis Salutis) muszą być widoczne, ale nie mogą blokować konwersji.
+  - **WPZ z ostrożnym komunikatem** - wskaźnik bilansowy nie wyłącza pożyczek wspólników (art. 11 ust. 4 p.u.), a u spółek finansowanych przez wspólników to przesądza o wyniku; arkusz nie może sugerować „niewypłacalności zadłużeniowej” bez tego zastrzeżenia.
+  - **Grupowanie union-find** zamiast hierarchii NIP > KRS > nazwa - SF ze schematu 1-0 mają tylko KRS, późniejsze NIP; nazwa zmienia się („w likwidacji”).
+  - **Przypięte wersje weba** - `>=` bez przebudowy przez 2 miesiące dawało złudzenie stabilności; każda przebudowa to loteria zależności.
+  - I6/I7 odłożone - poprawianie wzorów modeli wymaga źródeł, nie pamięci.
+- Problemy:
+  - Przestój czytnik.analizy.io ok. 15 min (od 10:42 UTC) po przebudowie obrazu - przyczyna w zależnościach, nie w kodzie konwertera.
+  - Skrypt LibreOffice nie działa na Windows; długie ścieżki OneDrive (>260 znaków) wymagały prefiksu `\\?\` lub `subst` przy testach.
+
+#### Szczegóły: poprawka znaku kosztów Mikro (`02176e6`)
 - `extract_financial_data_from_sprawozdanie` liczyła dla Mikro wynik ze sprzedaży jako A + B, zakładając ujemne B - w XML koszty (B, D) są dodatnie. Skutek: wynik ze sprzedaży zawyżony o dwukrotność kosztów, ROp > 200% przy stratach, fałszywie dobre modele (poznański, Prusak, Wierzba, Altman). Teraz WS = A - |B|, WDO = WS + C - |D|.
 - Nowe `_oznacz_modele_przy_ujemnym_kapitale`: przy KW < 0 pozytywny wynik modelu (FD_*) dostaje ocenę ostrzegawczą z uwagą o nieinterpretowalności.
 - Regresja na realnych XML (Strefa Klasyka, mikro 2018-2022, sprawa XII GC 90/26): ROp 2019 -26,18% (było +226%), FD_P -12,56 (było +4,35), FD_A -4,65 (było +7,75). **Arkusze mikro wygenerowane przed tą poprawką należy przegenerować.**
 
-### Poprawki 2026-09-25 (2) - przegląd poprawności mapowań i wskaźników
+#### Szczegóły: przegląd mapowań i wskaźników (`b006bd1`)
 Wynik przeglądu kodu pod kątem błędów analogicznych do znaku kosztów Mikro. Regresja: 29 próbek z `[Legacy]\...\Przykłady konwersji`, `Przykłady sprawozdań`, `Test`, `Test 2`, `Error - Lavinia` + 5 XML Strefa Klasyka; tryb wsadowy (16 podmiotów, 16 XLSX, 0 błędów) i pojedynczy bez wyjątków. **Arkusze Jednostek Innych (zwłaszcza z poz. K w RZiS) i wariantów kalkulacyjnych wygenerowane wcześniej należy przegenerować.**
 - **K1+K2 `indicators.py` - tabela `RZIS_MAP` (typ, wariant) wg XSD.** Inna porównawczy: zysk netto = L (wcześniej K = „pozostałe obowiązkowe zmniejszenia” -> zysk netto 0 w 5 próbkach, np. SUN STONE 2022 -2 293 954,16 zł jako 0). Wariant kalkulacyjny Małej (E/F-G/H-I/J/K/L) i Innej (F/G-H/I/J-K/L/M/N/O) nie jest już mapowany jak porównawczy (MIFLEX: WS -1 882 700,11 zamiast +62 898,85; AMONTEX: ZN -313 826,55 zamiast 0). Zysk netto bez łańcucha `or`. Koszty operacyjne kalkulacyjne = suma B+C+D (Mała) / B+D+E (Inna).
 - **Kontrola spójności RZiS** (brutto - podatek - obowiązkowe zmniejszenia = netto; Mikro: A - |B| + C - |D| - E = F; tolerancja 1 zł) -> `DaneFinansowe.uwagi`, wyświetlane jako „UWAGI DO DANYCH” w arkuszu Analiza wskaźnikowa (pojedynczy i wieloletni). Brak wyjątków.
@@ -41,25 +81,6 @@ Wynik przeglądu kodu pod kątem błędów analogicznych do znaku kosztów Mikro
 - **I4** - Mikro: `krotkoterminowe_rmk = None` (Aktywa_D to udziały własne), inne AO = B - B_1 - B_2 w WL jako „Inne AO” 50%, `zysk_strata_brutto = F + E`, nota o ograniczeniach Mikro w arkuszu. **I5** - `abs()` na amortyzacji Mikro. Kosmetyka: wartość 0 dni nie jest już wyświetlana jako „b/d”.
 - **Web:** `parser.py` jest współdzielony z `web/` (zmiana KRS/NIP) - przy najbliższym deployu przebudować obraz; `web/` nie był modyfikowany.
 - **Pozostało z przeglądu:** I2 (rozbieżności dane porównawcze vs SF roku poprzedniego, ignorowane KwotaB1), I3 (duplikaty roku / okresy niepełne, sortowanie po `data_sporzadzenia`, 365 dni dla okresów < 12 mies.), I6 (Altman - współczynniki wersji 1968 zamiast Z' dla nienotowanych), I7 (weryfikacja definicji Gajdki-Stosa, Mączyńskiej, Prusaka 1r/2l, Hadasik w źródłach), I10 (brak przeliczania WTysiacach w konsolidacji), I11 (JednostkaOp po cichu jako „Inna” z pustymi danymi). Ponadto: `src/mappings_generated.py` nie kompiluje się (literalne `\n` - stan sprzed tej sesji, moduł nieimportowany); Inna bez poz. `Pasywa_B_II` -> ZD None -> model poznański b/d.
-
-### Otwarte problemy
-- Brak testów automatycznych (unit tests).
-- `CLAUDE.md` w repo opisuje nieistniejącą już strukturę projektu (katalogi XSD zamiast kodu).
-- Modele dyskryminacyjne w arkuszu mają wartości liczone wewnętrznie (na sztywno, nie formułami) - do opinii prawnej zaleca się przeliczenie w pliku wzorcowym Kancelarii (`modele dyskryminacyjne dla sprawozdań od 2016 roku.xlsx`).
-- Amortyzacja ekstrahowana tylko dla wariantu porównawczego RZiS; dla kalkulacyjnego pozostaje `None`.
-- Parser czyta rok kolumny z `okres_do` XML - okresy nietypowe (np. 2023-2024) trafiają do kolumny roku końcowego.
-- Przeciągnięcie wielu plików naraz ograniczone limitem długości polecenia Windows - przy dużych partiach przeciągać folder.
-- `Konwertuj SF.bat` działa wyłącznie na Windowsie; na Linuksie odpowiednikiem jest wywołanie `src/konwertuj.py` z listą ścieżek (drag & drop pod KDE świadomie nieodwzorowany).
-
-### Zmienione pliki w tej sesji
-- `start.sh` (nowy) - uruchamia `src/run.py` przez `.venv`, sam wykrywa katalog repo, przekazuje argumenty do CLI, czytelny błąd gdy brak `.venv`
-- `README.md` - sekcja „Instalacja na Linuksie" (uv, powód: brak `pip`/`tkinter`), opis `start.sh`, równoważnik trybu wsadowego na Linuksie, `start.sh` w drzewie projektu
-- `web/README.md` - wariant uruchomienia lokalnego przez `uv` w odrębnym środowisku (pin `starlette<0.46`)
-- Poza repo (środowisko lokalne, nieśledzone): `.venv/`, `web/.venv/`, `web/.env`, `~/.local/share/applications/konwersja-sf.desktop`
-
----
-
-## Historia sesji
 
 ### 2026-09-07 — Klon na Linuksa, środowiska uv, skróty uruchamiania
 - Ukończone:
