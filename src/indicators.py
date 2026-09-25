@@ -122,6 +122,8 @@ class DaneFinansowe:
 
     # Metadane i uwagi o jakości danych (wyświetlane w arkuszu wskaźników)
     typ_jednostki: str = ""  # "Mikro" | "Mala" | "Inna"
+    jednostka_walutowa: str = "PLN"  # "PLN" | "tys. PLN"
+    dni_okresu: Optional[int] = None  # długość okresu sprawozdawczego (cykle rotacji)
     uwagi: List[str] = field(default_factory=list)
 
     @property
@@ -304,7 +306,19 @@ class KalkulatorWskaznikow:
         formatted = f"{float(value):,.2f}"
         # Zamień separatory na polskie (kropka->tymczasowy, przecinek->spacja, tymczasowy->przecinek)
         formatted = formatted.replace(",", " ").replace(".", ",")
-        return formatted
+        # Jednostka przy kwotach bezwzględnych (KP, WL) - sprawozdania WTysiacach
+        jedn = "tys. zł" if self.dane.jednostka_walutowa == "tys. PLN" else "zł"
+        return f"{formatted} {jedn}"
+
+    def _dni(self, baza: str) -> Decimal:
+        """Liczba dni do cykli rotacji: 365 (360) dla okresu rocznego, a dla
+        okresu niepełnego / dłuższego - proporcjonalnie do jego długości
+        (przepływy z RZiS dotyczą tylko dni_okresu dni)."""
+        b = Decimal(baza)
+        d = self.dane.dni_okresu
+        if d is None or d in (365, 366):
+            return b
+        return b * Decimal(d) / Decimal(365)
 
     # =========================================================================
     # WSKAŹNIKI PŁYNNOŚCI
@@ -860,13 +874,13 @@ class KalkulatorWskaznikow:
         # Cykl zapasów = (Średnie zapasy / Przychody netto ze sprzedaży) × 365
         if self.dane.srednie_zapasy is not None:
             wartosc = self._safe_divide(
-                self.dane.srednie_zapasy * Decimal("365"),
+                self.dane.srednie_zapasy * self._dni("365"),
                 self.dane.przychody_netto_ze_sprzedazy
             )
         elif self.dane.zapasy is not None:
             # Fallback - użyj bieżących zapasów
             wartosc = self._safe_divide(
-                self.dane.zapasy * Decimal("365"),
+                self.dane.zapasy * self._dni("365"),
                 self.dane.przychody_netto_ze_sprzedazy
             )
         else:
@@ -903,12 +917,12 @@ class KalkulatorWskaznikow:
         # Cykl należności = (Średnie należności / Przychody netto ze sprzedaży) × 365
         if self.dane.srednie_naleznosci_krotkoterm is not None:
             wartosc = self._safe_divide(
-                self.dane.srednie_naleznosci_krotkoterm * Decimal("365"),
+                self.dane.srednie_naleznosci_krotkoterm * self._dni("365"),
                 self.dane.przychody_netto_ze_sprzedazy
             )
         elif self.dane.naleznosci_krotkoterminowe is not None:
             wartosc = self._safe_divide(
-                self.dane.naleznosci_krotkoterminowe * Decimal("365"),
+                self.dane.naleznosci_krotkoterminowe * self._dni("365"),
                 self.dane.przychody_netto_ze_sprzedazy
             )
         else:
@@ -973,7 +987,7 @@ class KalkulatorWskaznikow:
         zob, opis_zob = self._zobowiazania_do_cyklu()
         wartosc = None
         if zob is not None:
-            wartosc = self._safe_divide(zob * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
+            wartosc = self._safe_divide(zob * self._dni("365"), self.dane.przychody_netto_ze_sprzedazy)
 
         if self.dane.typ_jednostki == "Mikro":
             ocena = OcenaWskaznika.BRAK_DANYCH
@@ -1017,15 +1031,15 @@ class KalkulatorWskaznikow:
 
         if self.dane.zapasy is not None and self.dane.przychody_netto_ze_sprzedazy:
             zap = self.dane.srednie_zapasy if self.dane.srednie_zapasy else self.dane.zapasy
-            cykl_zap = self._safe_divide(zap * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
+            cykl_zap = self._safe_divide(zap * self._dni("365"), self.dane.przychody_netto_ze_sprzedazy)
 
         if self.dane.naleznosci_krotkoterminowe is not None and self.dane.przychody_netto_ze_sprzedazy:
             nal = self.dane.srednie_naleznosci_krotkoterm if self.dane.srednie_naleznosci_krotkoterm else self.dane.naleznosci_krotkoterminowe
-            cykl_nal = self._safe_divide(nal * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
+            cykl_nal = self._safe_divide(nal * self._dni("365"), self.dane.przychody_netto_ze_sprzedazy)
 
         zob, _opis_zob = self._zobowiazania_do_cyklu()
         if zob is not None and self.dane.przychody_netto_ze_sprzedazy:
-            cykl_zob = self._safe_divide(zob * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
+            cykl_zob = self._safe_divide(zob * self._dni("365"), self.dane.przychody_netto_ze_sprzedazy)
 
         if cykl_zap is not None and cykl_nal is not None and cykl_zob is not None:
             wartosc = cykl_zap + cykl_nal - cykl_zob
@@ -1440,7 +1454,7 @@ class KalkulatorWskaznikow:
             koszt = self.dane.koszt_wytworzenia_sprzedanych or self.dane.koszty_dzialalnosci_operacyjnej
             x5 = self._safe_divide(srednie_zk, koszt)
             if x5 is not None:
-                x5 = x5 * Decimal("360")
+                x5 = x5 * self._dni("360")
 
             if all(v is not None for v in [x1, x2, x3, x4, x5]):
                 wartosc = (Decimal("0.605") +
@@ -1502,7 +1516,7 @@ class KalkulatorWskaznikow:
             koszt = self.dane.koszt_wytworzenia_sprzedanych or self.dane.koszty_dzialalnosci_operacyjnej
             x2 = self._safe_divide(srednie_zk, koszt)
             if x2 is not None:
-                x2 = x2 * Decimal("365")
+                x2 = x2 * self._dni("365")
 
             x3 = self._safe_divide(self.dane.zysk_strata_netto, srednie_aktywa)
             x4 = self._safe_divide(self.dane.zysk_strata_brutto, self.dane.przychody_netto_ze_sprzedazy)
@@ -1567,11 +1581,11 @@ class KalkulatorWskaznikow:
 
             x5 = self._safe_divide(self.dane.naleznosci_krotkoterminowe, self.dane.przychody_netto_ze_sprzedazy)
             if x5 is not None:
-                x5 = x5 * Decimal("365")
+                x5 = x5 * self._dni("365")
 
             x6 = self._safe_divide(self.dane.zapasy, self.dane.przychody_netto_ze_sprzedazy)
             if x6 is not None:
-                x6 = x6 * Decimal("365")
+                x6 = x6 * self._dni("365")
 
             x7 = self._safe_divide(self.dane.zysk_strata_netto, self.dane.zapasy)
 
@@ -1930,6 +1944,16 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
     typ_jednostki = sprawozdanie.metadane.typ_jednostki
     wariant = sprawozdanie.metadane.wariant_rzis
     dane.typ_jednostki = typ_jednostki
+    dane.jednostka_walutowa = sprawozdanie.metadane.jednostka_walutowa
+    od, do = sprawozdanie.metadane.okres_od, sprawozdanie.metadane.okres_do
+    if od is not None and do is not None:
+        dane.dni_okresu = (do - od).days + 1
+        if dane.dni_okresu not in (365, 366):
+            dane.uwagi.append(
+                f"Okres sprawozdawczy {od:%d.%m.%Y}-{do:%d.%m.%Y} ({dane.dni_okresu} dni) nie jest "
+                "rokiem - cykle rotacji (dni) przeliczono do długości okresu; wskaźniki oparte na "
+                "przepływach (rentowność, obrót aktywami, modele) dotyczą okresu niepełnego/dłuższego "
+                "i nie są wprost porównywalne z latami pełnymi.")
 
     # Słownik pozycji bilansu i RZiS
     bilans_dict = {}
@@ -1945,6 +1969,23 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
     # Zbierz pozycje RZiS
     for poz in sprawozdanie.rzis:
         rzis_dict[poz.kod] = poz.kwota_biezaca
+
+    # Pozycje składowe pominięte w XML przy obecnej pozycji nadrzędnej = 0
+    # (programy nie eksportują pozycji zerowych). Dotyczy pozycji sumujących
+    # się do nadrzędnej (I-IV) Małej/Innej; pozycji "w tym" nie uzupełniamy.
+    if typ_jednostki in ("Mala", "Inna"):
+        skladowe = {
+            "Aktywa_A": ("Aktywa_A_I", "Aktywa_A_II", "Aktywa_A_III", "Aktywa_A_IV", "Aktywa_A_V"),
+            "Aktywa_B": ("Aktywa_B_I", "Aktywa_B_II", "Aktywa_B_III", "Aktywa_B_IV"),
+            "Pasywa_B": ("Pasywa_B_I", "Pasywa_B_II", "Pasywa_B_III", "Pasywa_B_IV"),
+        }
+        for slownik in (bilans_dict, bilans_poprz_dict):
+            for nadrzedna, kody in skladowe.items():
+                if slownik.get(nadrzedna) is None:
+                    continue
+                for kod in kody:
+                    if slownik.get(kod) is None:
+                        slownik[kod] = Decimal("0")
 
     # =========================================================================
     # MAPOWANIE AKTYWÓW - różne struktury dla różnych typów jednostek

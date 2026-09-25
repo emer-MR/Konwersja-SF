@@ -1,11 +1,13 @@
 """
 Parser XML sprawozdań finansowych.
 
-Obsługuje formaty: XML, XAdES (podpisane elektronicznie).
-Wspiera jednostki: Mikro, Mała, Inna.
+Obsługuje formaty: XML, XAdES (podpisane elektronicznie), format 2025 z korzeniem
+`Dokument` (sprawozdanie zagnieżdżone w TrescDokumentu).
+Wspiera jednostki: Mikro, Mała, Inna (inne typy -> ValueError z opisem).
 Wspiera wersje schematów: 1-0, 1-2, 1-3.
 """
 
+import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -128,18 +130,51 @@ class SFParser:
         self.nsmap.update(self.NAMESPACES)
 
     def _detect_entity_type(self) -> str:
-        """Wykrywa typ jednostki z nazwy root elementu.
+        """Wykrywa typ jednostki.
+
+        Element sprawozdania to korzeń dokumentu (formaty do 2024 r.) albo
+        element zagnieżdżony: plik XAdES z podpisem otaczającym lub nowy format
+        2025 (korzeń `Dokument` z e-Doręczeń/ePUAP, sprawozdanie w
+        `TrescDokumentu/JednostkaMikro|Mala|Inna`). Gdy elementu Jednostka*
+        brak, typ ustalany jest po nazwie sekcji bilansu (BilansJednostka*).
+        Znaleziony element zapisywany jest w `self.sf_elem`.
 
         Returns:
             "Mikro", "Mala" lub "Inna"
+
+        Raises:
+            ValueError: nieobsługiwany typ sprawozdania (np. JednostkaOp)
         """
+        wzorzec = re.compile(r"^(Skonsolidowana)?Jednostka(Mikro|Mala|Inna|Op)")
+        self.sf_elem = self.root
         tag = etree.QName(self.root).localname
-        if "Mikro" in tag:
+        if not wzorzec.match(tag):
+            for elem in self.root.iter():
+                nazwa = self._safe_localname(elem)
+                if nazwa and wzorzec.match(nazwa):
+                    tag, self.sf_elem = nazwa, elem
+                    break
+            else:
+                for elem in self.root.iter():
+                    nazwa = self._safe_localname(elem)
+                    m = re.match(r"^Bilans(Jednostka(Mikro|Mala|Inna|Op))", nazwa or "")
+                    if m:
+                        tag, self.sf_elem = m.group(1), elem.getparent()
+                        break
+        if "JednostkaMikro" in tag:
             return "Mikro"
-        elif "Mala" in tag:
+        elif "JednostkaMala" in tag:
             return "Mala"
-        else:
+        elif "JednostkaInna" in tag:
             return "Inna"
+        if "JednostkaOp" in tag:
+            opis = "jednostki organizacji pozarządowej (JednostkaOp)"
+        else:
+            opis = f"dokumentu '{tag}'"
+        raise ValueError(
+            f"Nieobsługiwany typ sprawozdania: {opis}. Konwerter obsługuje wyłącznie "
+            "sprawozdania jednostek mikro, małych i innych (JednostkaMikro, JednostkaMala, "
+            "JednostkaInna) - struktura tego sprawozdania nie zostałaby poprawnie odczytana.")
 
     def _detect_schema_version(self) -> str:
         """Wykrywa wersję schematu z atrybutu wersjaSchemy lub namespace.
@@ -325,14 +360,19 @@ class SFParser:
         Returns:
             "PLN" lub "tys. PLN"
         """
-        # Sprawdź nazwę elementu głównego
-        tag = etree.QName(self.root).localname
-        if "WTys" in tag:
-            return "tys. PLN"
+        # Element sprawozdania (korzeń albo zagnieżdżony - format 2025, XAdES)
+        for elem in {self.root, getattr(self, "sf_elem", self.root)}:
+            tag = etree.QName(elem).localname
+            if "WTys" in tag:
+                return "tys. PLN"
+            ns = etree.QName(elem).namespace or ""
+            if "WTysiacach" in ns or "WTys" in ns:
+                return "tys. PLN"
 
-        # Sprawdź namespace elementu głównego
-        ns = etree.QName(self.root).namespace or ""
-        if "WTysiacach" in ns or "WTys" in ns:
+        # Kod sprawozdania, np. "SprFinJednostkaMikroWTysiacach" (jedyny
+        # wyznacznik jednostki w formacie 2025 z korzeniem Dokument)
+        kod = self._get_text(".//KodSprawozdania")
+        if kod and "WTysiacach" in kod:
             return "tys. PLN"
 
         # Domyślnie PLN (wariant WZlotych)
@@ -440,7 +480,7 @@ class SFParser:
 
         # Znajdź sekcję Bilans
         bilans_elem = None
-        for elem in self.root.iter():
+        for elem in getattr(self, 'sf_elem', self.root).iter():
             localname = self._safe_localname(elem)
             if localname and "Bilans" in localname and "JednostkaOp" not in localname:
                 bilans_elem = elem
@@ -474,7 +514,7 @@ class SFParser:
         # - JednostkaInna/Mala: <RZiS><RZiSPor>...</RZiSPor></RZiS> lub <RZiS><RZiSKalk>...</RZiSKalk></RZiS>
         # - JednostkaMikro: <RZiSJednostkaMikro><A>...</A><B>...</B>...</RZiSJednostkaMikro>
         rzis_elem = None
-        for elem in self.root.iter():
+        for elem in getattr(self, 'sf_elem', self.root).iter():
             localname = self._safe_localname(elem)
             if not localname:
                 continue

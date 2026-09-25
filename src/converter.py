@@ -12,7 +12,7 @@ Generuje wieloarkuszowy plik Excel:
 8. Dane analityczne - format długi do analizy
 """
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -21,6 +21,24 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 
 from models import Sprawozdanie, PozycjaFinansowa
+import okresy
+
+
+def _naglowek_biezacy(meta) -> str:
+    """'Rok 2022' dla roku kalendarzowego, inaczej 'Okres ...' (rok obrotowy
+    przesunięty, okres niepełny)."""
+    if okresy.czy_rok_kalendarzowy(meta.okres_od, meta.okres_do):
+        koniec = meta.okres_do
+        return f"Rok {koniec.year}"
+    return f"Okres {okresy.etykieta_okresu(meta.okres_od, meta.okres_do)}"
+
+
+def _naglowek_poprzedni(meta) -> str:
+    """Nagłówek kolumny danych porównawczych (okres poprzedni)."""
+    od_p, do_p = okresy.okres_poprzedni(meta.okres_od, meta.okres_do)
+    if okresy.czy_rok_kalendarzowy(od_p, do_p):
+        return f"Rok {do_p.year}"
+    return f"Okres poprzedni ({okresy.etykieta_okresu(od_p, do_p)})"
 
 
 class XLSXConverter:
@@ -163,9 +181,9 @@ class XLSXConverter:
         row += 2
         ws[f'A{row}'] = "Pozycja"
         jednostka_skrot = "tys." if meta.jednostka_walutowa == "tys. PLN" else ""
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year} [{meta.jednostka_walutowa}]"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} [{meta.jednostka_walutowa}]"
-        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone [{meta.jednostka_walutowa}]"
+        ws[f'B{row}'] = f"{_naglowek_biezacy(meta)} [{meta.jednostka_walutowa}]"
+        ws[f'C{row}'] = f"{_naglowek_poprzedni(meta)} [{meta.jednostka_walutowa}]"
+        ws[f'D{row}'] = f"{_naglowek_poprzedni(meta)} przekształcone [{meta.jednostka_walutowa}]"
 
         for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -220,9 +238,9 @@ class XLSXConverter:
         # Nagłówki kolumn
         row = 6
         ws[f'A{row}'] = "Pozycja"
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year} [{meta.jednostka_walutowa}]"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1} [{meta.jednostka_walutowa}]"
-        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone [{meta.jednostka_walutowa}]"
+        ws[f'B{row}'] = f"{_naglowek_biezacy(meta)} [{meta.jednostka_walutowa}]"
+        ws[f'C{row}'] = f"{_naglowek_poprzedni(meta)} [{meta.jednostka_walutowa}]"
+        ws[f'D{row}'] = f"{_naglowek_poprzedni(meta)} przekształcone [{meta.jednostka_walutowa}]"
 
         for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -259,9 +277,9 @@ class XLSXConverter:
         # Nagłówki kolumn
         row = 4
         ws[f'A{row}'] = "Pozycja"
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
-        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone"
+        ws[f'B{row}'] = f"{_naglowek_biezacy(meta)}"
+        ws[f'C{row}'] = f"{_naglowek_poprzedni(meta)}"
+        ws[f'D{row}'] = f"{_naglowek_poprzedni(meta)} przekształcone"
 
         for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -296,9 +314,9 @@ class XLSXConverter:
         # Nagłówki kolumn
         row = 5
         ws[f'A{row}'] = "Pozycja"
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
-        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone"
+        ws[f'B{row}'] = f"{_naglowek_biezacy(meta)}"
+        ws[f'C{row}'] = f"{_naglowek_poprzedni(meta)}"
+        ws[f'D{row}'] = f"{_naglowek_poprzedni(meta)} przekształcone"
 
         for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -334,9 +352,9 @@ class XLSXConverter:
         # Nagłówki kolumn
         row = 5
         ws[f'A{row}'] = "Pozycja"
-        ws[f'B{row}'] = f"Rok {meta.okres_do.year}"
-        ws[f'C{row}'] = f"Rok {meta.okres_do.year - 1}"
-        ws[f'D{row}'] = f"Rok {meta.okres_do.year - 1} przekształcone"
+        ws[f'B{row}'] = f"{_naglowek_biezacy(meta)}"
+        ws[f'C{row}'] = f"{_naglowek_poprzedni(meta)}"
+        ws[f'D{row}'] = f"{_naglowek_poprzedni(meta)} przekształcone"
 
         for col in ['A', 'B', 'C', 'D']:
             ws[f'{col}{row}'].font = self.HEADER_FONT
@@ -722,7 +740,7 @@ class XLSXConverter:
 
             # Rok poprzedni
             if poz.kwota_poprzednia is not None:
-                okres_poprz = date(meta.okres_do.year - 1, 12, 31)
+                okres_poprz = meta.okres_od - timedelta(days=1)  # koniec okresu porównawczego
                 ws.cell(row=row, column=1, value=firma.nazwa)
                 ws.cell(row=row, column=2, value=firma.nip)
                 ws.cell(row=row, column=3, value=firma.krs or "")
@@ -740,7 +758,7 @@ class XLSXConverter:
 
             # Rok poprzedni przekształcony
             if poz.kwota_przeksztalcona is not None:
-                okres_poprz = date(meta.okres_do.year - 1, 12, 31)
+                okres_poprz = meta.okres_od - timedelta(days=1)  # koniec okresu porównawczego
                 ws.cell(row=row, column=1, value=firma.nazwa)
                 ws.cell(row=row, column=2, value=firma.nip)
                 ws.cell(row=row, column=3, value=firma.krs or "")

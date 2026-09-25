@@ -13,21 +13,34 @@
 - **Konsolidacja wieloletnia** - przy mieszanych typach jednostki / wariantach RZiS osobne bloki „BLOK: ...” zamiast mieszania wierszy po kodzie
 - **Aplikacja webowa** (`web/`, https://czytnik.analizy.io, kontener `czytnik-sf` na VPS Hostinger) - wersje zależności przypięte w `web/requirements.txt`; procedura deployu i kontroli po deployu w `web/CLAUDE.md`
 
+- **Okresy sprawozdawcze** (`src/okresy.py`) - kolumny konsolidacji kluczowane okresem (okres niepełny, przesunięty rok obrotowy), korekta tego samego okresu wygrywa po `data_sporzadzenia`, cykle rotacji skalowane do długości okresu
+- **Rozbieżności danych porównawczych** - lista w arkuszu Podsumowanie (dane porównawcze SF okresu N vs dane bieżące SF okresu N-1; `KwotaB1` pokazywane informacyjnie)
+- **SF w tysiącach** - w konsolidacji przeliczane na złote (×1000); w pojedynczym SF jednostka przy KP/WL
+- **Format 2025 (`Dokument`)** - parser i walidator webowy rozpoznają SF zagnieżdżone w `TrescDokumentu`; nieobsługiwane typy (JednostkaOp) -> czytelny `ValueError`
+- **Testy** - `python -m pytest tests -q` (23 testy: syntetyczne + na próbkach Legacy, pomijane gdy brak katalogu)
+
 ### Co jest w trakcie
-- Brak rozpoczętych prac. Pozostałe ustalenia przeglądu (I2, I3, I8, I10, I11) - w następnych krokach.
+- Brak rozpoczętych prac.
+
+### Zmiany 2026-09-25 (sesja 3) - I2, I3, I8, I10, I11, format 2025
+- **I11 + format 2025** (`parser.py`): typ jednostki z elementu `Jednostka*` w dowolnym miejscu drzewa (korzeń, XAdES, nowy format z korzeniem `Dokument`), awaryjnie z nazwy `BilansJednostka*`; JednostkaOp i inne -> `ValueError` z opisem po polsku (w batch - pozycja w `bledy`, partia działa dalej). Jednostka walutowa także z `KodSprawozdania` (`...WTysiacach`). Sekcje bilansu/RZiS szukane w elemencie sprawozdania. SF 2025 MGBUD: Mikro, aktywa 481 255,33, KW 439 666,70, zobowiązania 41 588,63, przychody 0, ZN 0; porównawcze: aktywa 449 900,48, przychody 40 000, ZN 31 354,85.
+- **Web** (`web/app/xml_validator.py`): korzeń `Dokument` traktowany jak opakowanie (jak XAdES) - SF 2025 przechodzą walidację; JednostkaOp odrzucana komunikatem walidatora (bez zmian). **Wymaga deployu** (walidator + współdzielony `parser.py`).
+- **I3** (`okresy.py`, `multi_converter.py`, `converter.py`, `indicators.py`): klucz kolumny = (okres_od, okres_do), etykiety „2022”, „2022 (01.01-17.07)”, „01.04.2022-31.03.2023”; dane porównawcze przypisane do okresu kończącego się dzień przed początkiem SF; duplikat okresu -> SF z najpóźniejszą datą sporządzenia + ostrzeżenie (identyczne pliki - „daty jednakowe”); cykle (CZ, CN, CZob, CKG, Hołda X5, Gajdka-Stos X2, Hadasik X5/X6) × dni_okresu/365; uwaga o okresie ≠ 12 mies. Pojedynczy konwerter: nagłówki „Okres …” / „Okres poprzedni (…)” dla okresów niekalendarzowych, data okresu porównawczego = okres_od - 1 dzień. Dane analityczne: nowa kolumna M „okres”.
+- **I2**: arkusz Podsumowanie - tabele „ROZBIEŻNOŚCI: DANE PORÓWNAWCZE vs SPRAWOZDANIE ZA DANY OKRES” (Bilans, RZiS, zmiany w kapitale, przepływy; tylko ta sama struktura typ/wariant; tolerancja 0,01 zł, 10 zł dla SF w tysiącach) i „DANE PRZEKSZTAŁCONE (KwotaB1)” (gdy SF ma niezerowe KwotaB1). Wartości kolumn bez zmian.
+- **I8**: Mała/Inna - brak pozycji składowej (A.I-V, B.I-IV aktywów, B.I-IV pasywów) przy obecnej nadrzędnej = 0 -> model poznański i WZD liczone dla PMS/PMA/PBA/SUN STONE 2021.
+- **I10**: konsolidacja przelicza SF w tysiącach na złote (kopie, ×1000) z adnotacją w Podsumowaniu; KP/WL w arkuszu wskaźników z jednostką („zł” / „tys. zł”).
+- Regresja 34 plików: bez zmian poza zamierzonymi (I8: 7 plików Innej; I3: MIFLEX 334 dni - cykle i modele z cyklami; I11: JednostkaOp). Arkusze Bilans/RZiS grup jednorodnych identyczne jak przed zmianą.
 
 ### Następne kroki (priorytet)
 1. **Smoke test webu po deployu:** przepuścić jeden XML przez czytnik.analizy.io i raz zalogować się do panelu admina (nowe wersje pakietów, m.in. `bcrypt` 5.0 - dotąd sprawdzony tylko start aplikacji, `GET /` i `/docs`)
 2. ~~I7, I6~~ - zrobione 2026-09-25 (sesja 2, `a464e4a`): Gajdka-Stos, Mączyńska, Altman Z', próg Hadasik - patrz historia
 3. Instrukcje `.doc/.docx` w `DIR\Biegły\Wzory opinii\...` nadal opisują Altmana 1968 i dawne definicje modeli - zaktualizować przy okazji (szablony xlsx/xls już poprawione)
-4. **I2:** rozbieżności dane porównawcze vs SF roku poprzedniego -> lista w arkuszu Podsumowanie; obsługa `KwotaB1` (przekształcone)
-5. **I3:** dwa SF za jeden rok kalendarzowy (np. otwarcie likwidacji) - klucz kolumny = okres, sortowanie po `data_sporzadzenia`, cykle skalowane do długości okresu
-6. **I10 / I11 / I8:** przeliczanie WTysiacach w konsolidacji; `raise` dla JednostkaOp i innych nieobsługiwanych typów; Inna bez `Pasywa_B_II` -> ZD = 0 (model poznański b/d)
-7. Testy automatyczne - regresja na próbkach z `[Legacy]\...\Przykłady konwersji` jako pytest (skrypty z sesji 2026-09-25 były jednorazowe, w scratchpadzie)
+4. **Deploy webu** po sesji 3 (walidator `Dokument` + parser) i smoke test z SF za 2025
+5. Rozważyć: kolumna danych porównawczych pierwszego SF spółki (okres niepełny, np. „okres do 17.09.2018”) zawiera same zera - można ją pomijać
+6. Rozważyć: wskaźniki przepływowe (rentowność, obrót aktywami, modele) dla okresów niepełnych nie są annualizowane - obecnie tylko uwaga w arkuszu
 
 ### Otwarte problemy
 - **Arkusze wygenerowane przed 2026-09-25 są niewiarygodne** dla: Mikro (wynik ze sprzedaży, modele), Innej (zysk netto przy poz. K, CaR, WPZ), wariantów kalkulacyjnych, WPZ wszystkich typów, konsolidacji z mieszanymi typami - przegenerować przed użyciem w opinii.
-- Brak testów automatycznych (unit tests).
 - `CLAUDE.md` w repo (główny) opisuje nieistniejącą już strukturę projektu (katalogi XSD zamiast kodu).
 - `src/mappings_generated.py` nie kompiluje się (literalne `\n`) - moduł nieimportowany, stan od pierwszego commita.
 - Modele dyskryminacyjne w arkuszu liczone wewnętrznie (nie formułami) - do opinii prawnej przeliczać w pliku wzorcowym kancelarii.

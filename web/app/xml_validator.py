@@ -170,8 +170,9 @@ def validate_xml_structure(content: bytes) -> Tuple[bool, Optional[str], Optiona
                 entity_type = "Inna"
             break
 
-    # Jeśli główny element to Signature (XAdES), szukaj SF wewnątrz
-    if not is_valid_root and localname in ["Signature", "XAdES", "XAdESSignatures"]:
+    # Jeśli główny element to Signature (XAdES) albo Dokument (format sprawozdań
+    # od 2025 r. - SF zagnieżdżone w TrescDokumentu), szukaj SF wewnątrz
+    if not is_valid_root and localname in ["Signature", "XAdES", "XAdESSignatures", "Dokument"]:
         sf_element = find_sf_root_in_xades(root)
         if sf_element is not None:
             sf_root = sf_element
