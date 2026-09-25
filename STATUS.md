@@ -24,6 +24,11 @@
 4. Rozważyć: brak testów automatycznych (unit tests) dla całego projektu
 5. Rozważyć aktualizację `CLAUDE.md` w repo - opisuje projekt jako zbiór schematów XSD („data structure project, not a software project"), co jest nieaktualne od czasu powstania `src/` i `web/`
 
+### Poprawka 2026-09-25 - znak kosztów w RZiS Jednostki Mikro
+- `extract_financial_data_from_sprawozdanie` liczyła dla Mikro wynik ze sprzedaży jako A + B, zakładając ujemne B - w XML koszty (B, D) są dodatnie. Skutek: wynik ze sprzedaży zawyżony o dwukrotność kosztów, ROp > 200% przy stratach, fałszywie dobre modele (poznański, Prusak, Wierzba, Altman). Teraz WS = A - |B|, WDO = WS + C - |D|.
+- Nowe `_oznacz_modele_przy_ujemnym_kapitale`: przy KW < 0 pozytywny wynik modelu (FD_*) dostaje ocenę ostrzegawczą z uwagą o nieinterpretowalności.
+- Regresja na realnych XML (Strefa Klasyka, mikro 2018-2022, sprawa XII GC 90/26): ROp 2019 -26,18% (było +226%), FD_P -12,56 (było +4,35), FD_A -4,65 (było +7,75). **Arkusze mikro wygenerowane przed tą poprawką należy przegenerować.**
+
 ### Otwarte problemy
 - Brak testów automatycznych (unit tests).
 - `CLAUDE.md` w repo opisuje nieistniejącą już strukturę projektu (katalogi XSD zamiast kodu).

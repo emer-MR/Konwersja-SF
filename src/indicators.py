@@ -241,7 +241,28 @@ class KalkulatorWskaznikow:
         self._oblicz_model_altmana()
         self._oblicz_wilcox_gambler()
 
+        self._oznacz_modele_przy_ujemnym_kapitale()
+
         return self.wyniki
+
+    def _oznacz_modele_przy_ujemnym_kapitale(self):
+        """Przy ujemnym kapitale własnym modele dyskryminacyjne bywają
+        nieinterpretowalne (np. X = KW/zobowiązania, zysk zatrzymany/aktywa) -
+        pozytywna klasyfikacja nie może być wtedy traktowana jako sygnał braku
+        zagrożenia. Obniżamy ocenę do ostrzegawczej i dopisujemy uwagę."""
+        kw = self.dane.kapital_wlasny
+        if kw is None or kw >= 0:
+            return
+        for w in self.wyniki:
+            if not w.skrot.startswith("FD_"):
+                continue
+            if w.ocena in (OcenaWskaznika.OPTYMALNA, OcenaWskaznika.AKCEPTOWALNA):
+                w.ocena = OcenaWskaznika.OSTRZEGAWCZA
+                w.interpretacja = (
+                    "UWAGA: ujemny kapitał własny - pozytywny wynik modelu "
+                    "nieinterpretowalny, nie świadczy o braku zagrożenia. "
+                    + w.interpretacja
+                )
 
     def _safe_divide(self, licznik: Optional[Decimal], mianownik: Optional[Decimal]) -> Optional[Decimal]:
         """Bezpieczne dzielenie z obsługą None i dzielenia przez zero."""
@@ -1871,22 +1892,30 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
         # Jednostka Mikro - uproszczony RZiS
         # A = Przychody, B = Koszty, C = Pozostałe przychody, D = Pozostałe koszty
         # E = Podatek dochodowy, F = Zysk/strata netto
+        # Koszty (B) i pozostałe koszty (D) są w XML e-sprawozdań kwotami
+        # DODATNIMI (F = A - B + C - D - E). Wcześniejsza wersja zakładała, że
+        # B jest ujemne i liczyła A + B - dawało to wynik ze sprzedaży
+        # zawyżony o dwukrotność kosztów (np. +695 tys. zł zamiast -79 tys. zł),
+        # a w konsekwencji fałszywie dobre modele dyskryminacyjne i ROp > 200%.
+        # abs() zabezpiecza przed plikami, w których koszty podano ze znakiem minus.
         dane.przychody_netto_ze_sprzedazy = rzis_dict.get("A")
-        dane.koszty_dzialalnosci_operacyjnej = rzis_dict.get("B")
-        # Dla Mikro wynik ze sprzedaży = A + B (B jest ujemne w XML)
+        koszty = rzis_dict.get("B")
+        dane.koszty_dzialalnosci_operacyjnej = abs(koszty) if koszty is not None else None
         if dane.przychody_netto_ze_sprzedazy is not None and dane.koszty_dzialalnosci_operacyjnej is not None:
-            dane.wynik_ze_sprzedazy = dane.przychody_netto_ze_sprzedazy + dane.koszty_dzialalnosci_operacyjnej
+            dane.wynik_ze_sprzedazy = dane.przychody_netto_ze_sprzedazy - dane.koszty_dzialalnosci_operacyjnej
         dane.pozostale_przychody_operacyjne = rzis_dict.get("C")
-        dane.pozostale_koszty_operacyjne = rzis_dict.get("D")
+        pk = rzis_dict.get("D")
+        dane.pozostale_koszty_operacyjne = abs(pk) if pk is not None else None
         dane.podatek_dochodowy = rzis_dict.get("E")
         dane.zysk_strata_netto = rzis_dict.get("F")
-        # Wynik z działalności operacyjnej (przybliżenie)
-        if all(v is not None for v in [dane.wynik_ze_sprzedazy, dane.pozostale_przychody_operacyjne, dane.pozostale_koszty_operacyjne]):
-            dane.wynik_z_dzialalnosci_operacyjnej = (
-                dane.wynik_ze_sprzedazy +
-                dane.pozostale_przychody_operacyjne +
-                dane.pozostale_koszty_operacyjne  # już ujemne
-            )
+        # Wynik z działalności operacyjnej (przybliżenie): WS + C - D
+        if dane.wynik_ze_sprzedazy is not None:
+            wdo = dane.wynik_ze_sprzedazy
+            if dane.pozostale_przychody_operacyjne is not None:
+                wdo += dane.pozostale_przychody_operacyjne
+            if dane.pozostale_koszty_operacyjne is not None:
+                wdo -= dane.pozostale_koszty_operacyjne
+            dane.wynik_z_dzialalnosci_operacyjnej = wdo
 
     elif typ_jednostki == "Mala":
         # Jednostka Mała - RZiS 10-pozycyjny (A-J). W odróżnieniu od Jednostki
