@@ -438,6 +438,19 @@ class XLSXConverter:
 
             row += 1
 
+        # Uwagi o jakości / ograniczeniach danych (niespójności RZiS, Mikro)
+        if dane_finansowe.uwagi:
+            row += 1
+            ws.cell(row=row, column=1, value="UWAGI DO DANYCH:").font = Font(bold=True, color="CC0000")
+            row += 1
+            for uwaga in dane_finansowe.uwagi:
+                c = ws.cell(row=row, column=1, value=uwaga)
+                c.font = Font(bold=uwaga.startswith("NIESPÓJNOŚĆ"), color="CC0000")
+                c.alignment = Alignment(wrap_text=True, vertical="top")
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=9)
+                ws.row_dimensions[row].height = 45
+                row += 1
+
         # Podsumowanie ocen
         row += 2
         ws.cell(row=row, column=1, value="PODSUMOWANIE OCEN:")
@@ -522,8 +535,8 @@ class XLSXConverter:
         objasnienia_aktywnosc = [
             ("CZ", "(Średnie zapasy / Przychody) × 365", "Okres utrzymywania zapasów w dniach"),
             ("CN", "(Średnie należności / Przychody) × 365", "Okres ściągania należności w dniach"),
-            ("CZob", "(Średnie zobowiązania krótkoterm. / Przychody) × 365", "Okres regulowania zobowiązań w dniach"),
-            ("CKG", "CZ + CN - CZob", "Cykl konwersji gotówki. Ujemny = finansowanie z kredytu kupieckiego"),
+            ("CZob", "(Średnie zobowiązania z tyt. dostaw i usług / Przychody) × 365", "Okres regulowania zobowiązań w dniach (Mikro: brak danych)"),
+            ("CKG", "CZ + CN - CZob", "Cykl konwersji gotówki. Krótki/ujemny jest korzystny tylko przy terminowym regulowaniu zobowiązań (CZob ≤ 90 dni, CR ≥ 1)"),
         ]
         for skrot, wzor, opis in objasnienia_aktywnosc:
             ws.cell(row=row, column=1, value=skrot).font = Font(bold=True)
@@ -571,7 +584,8 @@ class XLSXConverter:
             ("Model Altmana (FD_A)", "1,2×X₁ + 1,4×X₂ + 3,3×X₃ + 0,6×X₄ + 1,0×X₅",
              "X₁=KP/A, X₂=ZZ/A, X₃=EBIT/A, X₄=KW/ZO, X₅=PS/A. Progi: Z≥3 bezpieczna, 1,8<Z<3 strefa szara, Z≤1,8 zagrożenie"),
             ("Wilcox-Gambler (WL)", "ŚP + 0,70×Nal + 0,50×Zap + 0,50×Inne + 0,50×AT - ZK - ZD",
-             "Wartość likwidacyjna majątku. WL>0 wypłacalność w ujęciu likwidacyjnym"),
+             "Wartość likwidacyjna majątku. WL>0 wypłacalność w ujęciu likwidacyjnym. "
+             "Mikro: AO poza zapasami i należnościami (w tym gotówka) ujęte jako Inne AO w 50%"),
         ]
         for skrot, wzor, opis in objasnienia_modele_zagr:
             ws.cell(row=row, column=1, value=skrot).font = Font(bold=True)

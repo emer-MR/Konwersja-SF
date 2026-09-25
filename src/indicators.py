@@ -117,6 +117,12 @@ class DaneFinansowe:
     zobowiazania_handlowe: Optional[Decimal] = None  # Zobowiązania z tytułu dostaw i usług
     koszt_wytworzenia_sprzedanych: Optional[Decimal] = None  # Koszt wytworzenia sprzedanych produktów
     sprzedaz_produktow: Optional[Decimal] = None  # Przychody ze sprzedaży produktów
+    zobowiazania_handlowe_poprz: Optional[Decimal] = None  # Zob. z tyt. dostaw i usług - początek okresu
+    inne_aktywa_obrotowe: Optional[Decimal] = None  # Mikro: AO - zapasy - należności (m.in. środki pieniężne)
+
+    # Metadane i uwagi o jakości danych (wyświetlane w arkuszu wskaźników)
+    typ_jednostki: str = ""  # "Mikro" | "Mala" | "Inna"
+    uwagi: List[str] = field(default_factory=list)
 
     @property
     def kapital_staly(self) -> Optional[Decimal]:
@@ -591,9 +597,21 @@ class KalkulatorWskaznikow:
             self.dane.kapital_wlasny
         )
 
-        if wartosc is None:
+        kw = self.dane.kapital_wlasny
+        if self.dane.typ_jednostki == "Mikro":
+            # Bilans Mikro nie rozróżnia zobowiązań długo- i krótkoterminowych
+            # (ZD = 0 jest umowne) - wartość 0 nie może być oceniana jako optymalna.
+            wartosc = None
+            ocena = OcenaWskaznika.BRAK_DANYCH
+            interpretacja = ("Brak danych: bilans jednostki mikro nie wyodrębnia "
+                             "zobowiązań długoterminowych.")
+        elif wartosc is None:
             ocena = OcenaWskaznika.BRAK_DANYCH
             interpretacja = "Brak wystarczających danych."
+        elif kw is not None and kw <= 0:
+            ocena = OcenaWskaznika.KRYTYCZNA
+            interpretacja = ("ALARM: Ujemny lub zerowy kapitał własny - wskaźnik "
+                             "nieinterpretowalny (nie świadczy o bezpiecznym poziomie zadłużenia).")
         elif wartosc > Decimal("1.0"):
             ocena = OcenaWskaznika.KRYTYCZNA
             interpretacja = "ALARM: Zobowiązania długoterminowe przewyższają kapitał własny."
@@ -871,7 +889,7 @@ class KalkulatorWskaznikow:
             nazwa="Cykl zapasów",
             skrot="CZ",
             wartosc=wartosc,
-            wartosc_str=f"{float(wartosc):.1f}".replace(".", ",") + " dni" if wartosc else "b/d",
+            wartosc_str=self._format_dni(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
             wzor="(Średnie zapasy / Przychody netto ze sprzedaży) × 365 dni",
@@ -916,7 +934,7 @@ class KalkulatorWskaznikow:
             nazwa="Cykl należności",
             skrot="CN",
             wartosc=wartosc,
-            wartosc_str=f"{float(wartosc):.1f}".replace(".", ",") + " dni" if wartosc else "b/d",
+            wartosc_str=self._format_dni(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
             wzor="(Średnie należności / Przychody netto ze sprzedaży) × 365 dni",
@@ -925,23 +943,43 @@ class KalkulatorWskaznikow:
             zrodlo="Literatura finansowa",
         ))
 
+    def _zobowiazania_do_cyklu(self):
+        """Zwraca (średnie lub bieżące zobowiązania do cyklu zobowiązań, opis).
+
+        Mała/Inna: zobowiązania z tytułu dostaw i usług (gdy dostępne w XML),
+        w przeciwnym razie zobowiązania krótkoterminowe ogółem (z adnotacją).
+        Mikro: None - bilans mikro nie wyodrębnia zobowiązań handlowych,
+        a Pasywa B obejmują także pożyczki i rezerwy.
+        """
+        if self.dane.typ_jednostki == "Mikro":
+            return None, ""
+        zh = self.dane.zobowiazania_handlowe
+        if zh is not None:
+            zhp = self.dane.zobowiazania_handlowe_poprz
+            return ((zh + zhp) / 2 if zhp is not None else zh), "zobowiązania z tytułu dostaw i usług"
+        zk = self.dane.srednie_zobowiazania_krotkoterm
+        if zk is None:
+            zk = self.dane.zobowiazania_krotkoterminowe
+        return zk, "zobowiązania krótkoterminowe ogółem (brak pozycji dostaw i usług w XML)"
+
+    def _format_dni(self, wartosc: Optional[Decimal]) -> str:
+        if wartosc is None:
+            return "b/d"
+        return f"{float(wartosc):.1f}".replace(".", ",") + " dni"
+
     def _oblicz_cykl_zobowiazan(self):
         """Wskaźnik cyklu zobowiązań (w dniach)."""
-        # Cykl zobowiązań = (Średnie zobowiązania krótkoterm. / Przychody netto ze sprzedaży) × 365
-        if self.dane.srednie_zobowiazania_krotkoterm is not None:
-            wartosc = self._safe_divide(
-                self.dane.srednie_zobowiazania_krotkoterm * Decimal("365"),
-                self.dane.przychody_netto_ze_sprzedazy
-            )
-        elif self.dane.zobowiazania_krotkoterminowe is not None:
-            wartosc = self._safe_divide(
-                self.dane.zobowiazania_krotkoterminowe * Decimal("365"),
-                self.dane.przychody_netto_ze_sprzedazy
-            )
-        else:
-            wartosc = None
+        # Cykl zobowiązań = (Średnie zobowiązania z tyt. dostaw i usług / Przychody netto ze sprzedaży) × 365
+        zob, opis_zob = self._zobowiazania_do_cyklu()
+        wartosc = None
+        if zob is not None:
+            wartosc = self._safe_divide(zob * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
 
-        if wartosc is None:
+        if self.dane.typ_jednostki == "Mikro":
+            ocena = OcenaWskaznika.BRAK_DANYCH
+            interpretacja = ("Brak danych: bilans jednostki mikro nie wyodrębnia zobowiązań "
+                             "z tytułu dostaw i usług (Pasywa B obejmują też pożyczki i rezerwy).")
+        elif wartosc is None:
             ocena = OcenaWskaznika.BRAK_DANYCH
             interpretacja = "Brak wystarczających danych."
         elif wartosc > Decimal("90"):
@@ -953,15 +991,17 @@ class KalkulatorWskaznikow:
         else:
             ocena = OcenaWskaznika.OPTYMALNA
             interpretacja = "Umiarkowany cykl zobowiązań."
+        if wartosc is not None and opis_zob:
+            interpretacja += f" (Licznik: {opis_zob}.)"
 
         self.wyniki.append(WynikWskaznika(
             nazwa="Cykl zobowiązań",
             skrot="CZob",
             wartosc=wartosc,
-            wartosc_str=f"{float(wartosc):.1f}".replace(".", ",") + " dni" if wartosc else "b/d",
+            wartosc_str=self._format_dni(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
-            wzor="(Średnie zobowiązania krótkoterm. / Przychody netto ze sprzedaży) × 365 dni",
+            wzor="(Średnie zobowiązania z tyt. dostaw i usług / Przychody netto ze sprzedaży) × 365 dni",
             optimum="30-60 dni",
             wartosc_krytyczna="> 90 dni (może oznaczać problemy)",
             zrodlo="Literatura finansowa",
@@ -983,8 +1023,8 @@ class KalkulatorWskaznikow:
             nal = self.dane.srednie_naleznosci_krotkoterm if self.dane.srednie_naleznosci_krotkoterm else self.dane.naleznosci_krotkoterminowe
             cykl_nal = self._safe_divide(nal * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
 
-        if self.dane.zobowiazania_krotkoterminowe is not None and self.dane.przychody_netto_ze_sprzedazy:
-            zob = self.dane.srednie_zobowiazania_krotkoterm if self.dane.srednie_zobowiazania_krotkoterm else self.dane.zobowiazania_krotkoterminowe
+        zob, _opis_zob = self._zobowiazania_do_cyklu()
+        if zob is not None and self.dane.przychody_netto_ze_sprzedazy:
             cykl_zob = self._safe_divide(zob * Decimal("365"), self.dane.przychody_netto_ze_sprzedazy)
 
         if cykl_zap is not None and cykl_nal is not None and cykl_zob is not None:
@@ -992,9 +1032,30 @@ class KalkulatorWskaznikow:
         else:
             wartosc = None
 
-        if wartosc is None:
+        cr = self._safe_divide(self.dane.aktywa_obrotowe, self.dane.zobowiazania_krotkoterminowe)
+        sygnal_zatorow = (cykl_zob is not None and cykl_zob > Decimal("90")) or (cr is not None and cr < Decimal("1"))
+
+        if self.dane.typ_jednostki == "Mikro":
+            wartosc = None
+            ocena = OcenaWskaznika.BRAK_DANYCH
+            interpretacja = ("Brak danych: bilans jednostki mikro nie wyodrębnia zobowiązań "
+                             "z tytułu dostaw i usług - cykl konwersji byłby liczony od wszystkich "
+                             "zobowiązań (w tym pożyczek) i nie ma sensu ekonomicznego.")
+        elif wartosc is None:
             ocena = OcenaWskaznika.BRAK_DANYCH
             interpretacja = "Brak wystarczających danych."
+        elif wartosc < Decimal("30") and sygnal_zatorow:
+            # Krótki/ujemny cykl przy długim cyklu zobowiązań lub CR < 1 oznacza
+            # zwykle nieregulowanie zobowiązań, a nie efektywne zarządzanie.
+            ocena = OcenaWskaznika.KRYTYCZNA if wartosc < 0 else OcenaWskaznika.OSTRZEGAWCZA
+            przyczyny = []
+            if cykl_zob is not None and cykl_zob > Decimal("90"):
+                przyczyny.append(f"cykl zobowiązań {self._format_dni(cykl_zob)}")
+            if cr is not None and cr < Decimal("1"):
+                przyczyny.append(f"płynność bieżąca {self._format_ratio(cr)} < 1")
+            interpretacja = ("ALARM: Krótki/ujemny cykl konwersji wynika z przetrzymywania "
+                             "(nieregulowania) zobowiązań - " + ", ".join(przyczyny) +
+                             ". Nie świadczy o efektywności ani o finansowaniu kredytem kupieckim.")
         elif wartosc < Decimal("0"):
             ocena = OcenaWskaznika.OPTYMALNA
             interpretacja = "Ujemny cykl konwersji - przedsiębiorstwo finansuje się ze środków dostawców."
@@ -1012,11 +1073,11 @@ class KalkulatorWskaznikow:
             nazwa="Cykl konwersji gotówki",
             skrot="CKG",
             wartosc=wartosc,
-            wartosc_str=f"{float(wartosc):.1f}".replace(".", ",") + " dni" if wartosc else "b/d",
+            wartosc_str=self._format_dni(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
-            wzor="Cykl zapasów + Cykl należności - Cykl zobowiązań",
-            optimum="Im krótszy, tym lepiej (ujemny = bardzo dobry)",
+            wzor="Cykl zapasów + Cykl należności - Cykl zobowiązań (dostaw i usług)",
+            optimum="Im krótszy, tym lepiej - o ile zobowiązania są regulowane terminowo (CZob ≤ 90 dni, CR ≥ 1)",
             wartosc_krytyczna="> 60 dni",
             zrodlo="Literatura finansowa",
         ))
@@ -1096,27 +1157,47 @@ class KalkulatorWskaznikow:
 
     def _oblicz_wskaznik_art_11_ust_5(self):
         """Wskaźnik pokrycia zobowiązań wg art. 11 ust. 5 PrUpad."""
-        # Wzór: (ZO - Rez - ZJP) / (A - składniki wyłączone)
-        # Uproszczenie: używamy dostępnych danych
+        # Art. 11 ust. 5 p.u.: zobowiązania wg bilansu z wyłączeniem rezerw na
+        # zobowiązania oraz zobowiązań wobec jednostek powiązanych / aktywa.
+        # - Mikro: ZO = Pasywa B (zobowiązania I rezerwy) -> odejmujemy Pasywa_B_1.
+        # - Mała/Inna: ZO = ZD + ZK (rezerwy B.I nie są wliczone) -> NIE
+        #   odejmujemy rezerw drugi raz.
+        # - Inna: zob. wobec jedn. powiązanych = Pasywa_B_II_1 + Pasywa_B_III_1;
+        #   bilans Mikro/Małej ich nie wyodrębnia.
+        typ = self.dane.typ_jednostki
         if self.dane.zobowiazania_ogolem is None or self.dane.aktywa_ogolem is None:
             wartosc = None
         else:
             licznik = self.dane.zobowiazania_ogolem
-            if self.dane.rezerwy_na_zobowiazania is not None:
+            if typ == "Mikro" and self.dane.rezerwy_na_zobowiazania is not None:
                 licznik -= self.dane.rezerwy_na_zobowiazania
             if self.dane.zobowiazania_wobec_jedn_powiazanych is not None:
                 licznik -= self.dane.zobowiazania_wobec_jedn_powiazanych
             wartosc = self._safe_divide(licznik, self.dane.aktywa_ogolem)
+
+        if typ == "Inna":
+            zakres = "bez rezerw i bez zobowiązań wobec jednostek powiązanych"
+        else:
+            zakres = ("bez rezerw; zobowiązań wobec jednostek powiązanych NIE wyłączono - "
+                      f"bilans jednostki {'mikro' if typ == 'Mikro' else 'małej'} ich nie wyodrębnia")
+        zastrzezenie = (" Wskaźnik opiera się na wartościach bilansowych i nie wyłącza pożyczek "
+                        "wspólników ani zobowiązań przyszłych/warunkowych (art. 11 ust. 4 p.u.) - "
+                        "przy finansowaniu pożyczkami wspólników wymaga korekty wg informacji dodatkowej.")
 
         if wartosc is None:
             ocena = OcenaWskaznika.BRAK_DANYCH
             interpretacja = "Brak wystarczających danych."
         elif wartosc > Decimal("1.0"):
             ocena = OcenaWskaznika.KRYTYCZNA
-            interpretacja = "ALARM: Zobowiązania przewyższają aktywa! Jeśli stan trwa > 24 miesięcy = niewypłacalność zadłużeniowa (art. 11 ust. 2 PrUpad)."
+            interpretacja = (f"ALARM: Zobowiązania bilansowe ({zakres}) przewyższają aktywa. "
+                             "Utrzymywanie się tego stanu przez okres przekraczający 24 miesiące "
+                             "rodzi wzruszalne domniemanie niewypłacalności z art. 11 ust. 5 p.u. "
+                             "(przesłanka z art. 11 ust. 2)." + zastrzezenie)
         else:
             ocena = OcenaWskaznika.AKCEPTOWALNA
-            interpretacja = "Aktywa pokrywają zobowiązania. Brak przesłanki majątkowej niewypłacalności."
+            interpretacja = (f"Zobowiązania bilansowe ({zakres}) nie przewyższają aktywów - "
+                             "domniemanie z art. 11 ust. 5 p.u. nie zachodzi. Nie przesądza to o braku "
+                             "przesłanki z art. 11 ust. 2 (decyduje rzeczywista wartość majątku)." + zastrzezenie)
 
         self.wyniki.append(WynikWskaznika(
             nazwa="Wskaźnik pokrycia zobowiązań (art. 11 ust. 5 PrUpad)",
@@ -1125,10 +1206,10 @@ class KalkulatorWskaznikow:
             wartosc_str=self._format_ratio(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
-            wzor="(Zobowiązania - Rezerwy - Zob. wobec jedn. powiązanych) / Aktywa",
-            optimum="< 1,0",
-            wartosc_krytyczna="> 1,0 przez ponad 24 miesiące",
-            zrodlo="Art. 11 ust. 2 i 5 PrUpad",
+            wzor="(Zobowiązania bez rezerw - Zob. wobec jedn. powiązanych) / Aktywa",
+            optimum="≤ 1,0",
+            wartosc_krytyczna="> 1,0 przez ponad 24 miesiące (domniemanie wzruszalne)",
+            zrodlo="Art. 11 ust. 2, 4 i 5 PrUpad",
         ))
 
     # =========================================================================
@@ -1722,6 +1803,11 @@ class KalkulatorWskaznikow:
                     ik_bez_sp -= self.dane.srodki_pieniezne
                 if ik_bez_sp > 0:
                     wl += Decimal("0.50") * ik_bez_sp
+            # Mikro: bilans nie wyodrębnia środków pieniężnych - pozostała część
+            # aktywów obrotowych (AO - zapasy - należności, w tym gotówka)
+            # traktowana jako "inne AO" w 50% (ostrożnie, zgodnie ze wzorem).
+            if self.dane.inne_aktywa_obrotowe is not None and self.dane.inne_aktywa_obrotowe > 0:
+                wl += Decimal("0.50") * self.dane.inne_aktywa_obrotowe
 
             # Majątek trwały (50%)
             if self.dane.aktywa_trwale is not None:
@@ -1746,6 +1832,9 @@ class KalkulatorWskaznikow:
         else:
             ocena = OcenaWskaznika.OPTYMALNA
             interpretacja = "Wartość likwidacyjna dodatnia - przedsiębiorstwo wypłacalne w ujęciu likwidacyjnym."
+        if wartosc is not None and self.dane.typ_jednostki == "Mikro":
+            interpretacja += (" (Mikro: środki pieniężne nie są wyodrębnione - AO poza zapasami "
+                              "i należnościami ujęto jako inne AO w 50%.)")
 
         self.wyniki.append(WynikWskaznika(
             nazwa="Wartość likwidacyjna (Wilcox-Gambler)",
@@ -1761,15 +1850,67 @@ class KalkulatorWskaznikow:
         ))
 
 
+# =============================================================================
+# MAPOWANIE RZiS (Mała / Inna) wg XSD e-sprawozdań (schematy 1-0, 1-2, 1-3)
+# =============================================================================
+# Klucze:
+#   PS  - przychody netto ze sprzedaży      KDO - koszty operacyjne (suma pozycji)
+#   WS  - wynik ze sprzedaży                PPO/PKO - pozostałe przychody/koszty operacyjne
+#   WDO - wynik z dział. operacyjnej (None = liczony: WS + PPO - PKO)
+#   PF/KF - przychody/koszty finansowe      ZB - wynik brutto   PD - podatek
+#   OZ  - pozostałe obowiązkowe zmniejszenia zysku (None = brak pozycji)
+#   ZN  - wynik netto                        AM - amortyzacja   KW - koszt wytworzenia sprzedanych
+# UWAGA: w Jednostce Innej (wariant porównawczy) poz. K to "pozostałe obowiązkowe
+# zmniejszenia zysku", a zysk netto to poz. L; w wariancie kalkulacyjnym zysk netto
+# to poz. O. Wcześniejsza wersja brała K / mapowała kalkulacyjny jak porównawczy.
+RZIS_MAP = {
+    ("Mala", "porownawczy"): dict(
+        PS="A", KDO=("B",), WS="C", PPO="D", PKO="E", WDO=None, PF="F", KF="G",
+        ZB="H", PD="I", OZ=None, ZN="J", AM="B_I", KW=None),
+    ("Mala", "kalkulacyjny"): dict(
+        PS="A", KDO=("B", "C", "D"), WS="E", PPO="F", PKO="G", WDO=None, PF="H", KF="I",
+        ZB="J", PD="K", OZ=None, ZN="L", AM=None, KW="B"),
+    ("Inna", "porownawczy"): dict(
+        PS="A", KDO=("B",), WS="C", PPO="D", PKO="E", WDO="F", PF="G", KF="H",
+        ZB="I", PD="J", OZ="K", ZN="L", AM="B_I", KW=None),
+    ("Inna", "kalkulacyjny"): dict(
+        PS="A", KDO=("B", "D", "E"), WS="F", PPO="G", PKO="H", WDO="I", PF="J", KF="K",
+        ZB="L", PD="M", OZ="N", ZN="O", AM=None, KW="B_I"),
+}
+
+UWAGA_MIKRO = (
+    "Jednostka mikro - ograniczenia danych: bilans nie rozróżnia zobowiązań krótko- "
+    "i długoterminowych (wszystkie zobowiązania i rezerwy potraktowano jako krótkoterminowe, "
+    "co zaniża CR, QR, KP), nie wyodrębnia środków pieniężnych ani zobowiązań handlowych "
+    "(CaR, CZob, CKG, WZD - brak danych); RZiS nie wyodrębnia działalności finansowej, "
+    "więc 'wynik z działalności operacyjnej' (EBIT w modelach Altmana, Prusaka, Wierzby, ROp) "
+    "obejmuje przychody i koszty finansowe, w tym odsetki."
+)
+
+TOLERANCJA_SPOJNOSCI = Decimal("1.00")
+
+
+def _suma_opcjonalna(wartosci):
+    wartosci = [v for v in wartosci if v is not None]
+    return sum(wartosci, Decimal("0")) if wartosci else None
+
+
+def _fmt_kwota(v) -> str:
+    return f"{float(v):,.2f}".replace(",", " ").replace(".", ",")
+
+
 def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
     """
     Wyciąga dane finansowe ze sprawozdania do struktury DaneFinansowe.
 
     Mapowanie pozycji XML na dane finansowe jest zależne od typu jednostki
-    i struktury sprawozdania (Mikro, Mała, Inna).
+    (Mikro, Mała, Inna) i wariantu RZiS (porównawczy / kalkulacyjny).
+    Wykryte niespójności danych trafiają do `dane.uwagi` (bez wyjątku).
     """
     dane = DaneFinansowe()
     typ_jednostki = sprawozdanie.metadane.typ_jednostki
+    wariant = sprawozdanie.metadane.wariant_rzis
+    dane.typ_jednostki = typ_jednostki
 
     # Słownik pozycji bilansu i RZiS
     bilans_dict = {}
@@ -1794,36 +1935,33 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
     dane.aktywa_trwale = bilans_dict.get("Aktywa_A")
 
     if typ_jednostki == "Mikro":
-        # Jednostka Mikro - uproszczona struktura
-        # Aktywa: A (trwałe), B (obrotowe), B_1 (zapasy), B_2 (krótkoterm.), C, D (RMK)
+        # Jednostka Mikro (XSD): A (trwałe), B (obrotowe), B_1 (zapasy),
+        # B_2 (należności krótkoterminowe), C (należne wpłaty na kapitał),
+        # D (udziały/akcje własne - NIE rozliczenia międzyokresowe).
         dane.aktywa_obrotowe = bilans_dict.get("Aktywa_B")
         dane.zapasy = bilans_dict.get("Aktywa_B_1")
         dane.zapasy_poprz = bilans_poprz_dict.get("Aktywa_B_1")
-        # B_2 to należności i inwestycje krótkoterminowe razem
         dane.naleznosci_krotkoterminowe = bilans_dict.get("Aktywa_B_2")
         dane.naleznosci_krotkoterminowe_poprz = bilans_poprz_dict.get("Aktywa_B_2")
-        dane.krotkoterminowe_rmk = bilans_dict.get("Aktywa_D")
-        # Środki pieniężne - przybliżenie (brak osobnej pozycji w Mikro)
-        # Użyj części B_2 jako przybliżenia lub None
+        dane.krotkoterminowe_rmk = None
         dane.srodki_pieniezne = None  # Mikro nie wyodrębnia środków pieniężnych
+        if dane.aktywa_obrotowe is not None:
+            dane.inne_aktywa_obrotowe = (dane.aktywa_obrotowe
+                                         - (dane.zapasy or Decimal("0"))
+                                         - (dane.naleznosci_krotkoterminowe or Decimal("0")))
 
     elif typ_jednostki == "Mala":
-        # Jednostka Mała - pośrednia struktura
         dane.aktywa_obrotowe = bilans_dict.get("Aktywa_B")
         dane.zapasy = bilans_dict.get("Aktywa_B_I")
         dane.zapasy_poprz = bilans_poprz_dict.get("Aktywa_B_I")
         dane.naleznosci_krotkoterminowe = bilans_dict.get("Aktywa_B_II")
         dane.naleznosci_krotkoterminowe_poprz = bilans_poprz_dict.get("Aktywa_B_II")
         dane.inwestycje_krotkoterminowe = bilans_dict.get("Aktywa_B_III")
-        dane.srodki_pieniezne = (
-            bilans_dict.get("Aktywa_B_III_A_1") or   # środki pieniężne w kasie i na rachunkach
-            bilans_dict.get("Aktywa_B_III_c") or
-            bilans_dict.get("Aktywa_B_III_1_c")
-        )
+        # XSD Mała: B.III.A.1 "środki pieniężne w kasie i na rachunkach"
+        dane.srodki_pieniezne = bilans_dict.get("Aktywa_B_III_A_1")
         dane.krotkoterminowe_rmk = bilans_dict.get("Aktywa_B_IV")
 
     else:  # Inna
-        # Jednostka Inna - pełna struktura
         dane.aktywa_obrotowe = bilans_dict.get("Aktywa_B")
         dane.rzeczowe_aktywa_trwale = bilans_dict.get("Aktywa_A_II")
         dane.zapasy = bilans_dict.get("Aktywa_B_I")
@@ -1831,34 +1969,39 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
         dane.naleznosci_krotkoterminowe = bilans_dict.get("Aktywa_B_II")
         dane.naleznosci_krotkoterminowe_poprz = bilans_poprz_dict.get("Aktywa_B_II")
         dane.inwestycje_krotkoterminowe = bilans_dict.get("Aktywa_B_III")
-        dane.srodki_pieniezne = (
-            bilans_dict.get("Aktywa_B_III_1_c") or
-            bilans_dict.get("Aktywa_B_III_c") or
-            dane.inwestycje_krotkoterminowe  # fallback
-        )
+        # XSD Inna: B.III.1.c "Środki pieniężne i inne aktywa pieniężne"
+        # (kod Aktywa_B_III_1_C, wielka litera), w tym C_1 "w kasie i na
+        # rachunkach". Bez fallbacku na całe inwestycje krótkoterminowe.
+        sp = bilans_dict.get("Aktywa_B_III_1_C")
+        if sp is None:
+            sp = bilans_dict.get("Aktywa_B_III_1_C_1")
+        dane.srodki_pieniezne = sp
         dane.krotkoterminowe_rmk = bilans_dict.get("Aktywa_B_IV")
 
     # =========================================================================
-    # MAPOWANIE PASYWÓW - różne struktury dla różnych typów jednostek
+    # MAPOWANIE PASYWÓW
     # =========================================================================
     dane.pasywa_ogolem = bilans_dict.get("Pasywa")
     dane.kapital_wlasny = bilans_dict.get("Pasywa_A")
 
     if typ_jednostki == "Mikro":
-        # Jednostka Mikro: Pasywa_B = zobowiązania ogółem (bez rozróżnienia)
+        # Pasywa_B = "Zobowiązania i rezerwy na zobowiązania" (bez podziału
+        # na długo/krótkoterminowe); Pasywa_B_1 = rezerwy.
         dane.zobowiazania_ogolem = bilans_dict.get("Pasywa_B")
-        # Mikro nie rozróżnia zobowiązań długo/krótkoterminowych
-        # Przyjmujemy wszystkie jako krótkoterminowe (konserwatywne podejście)
+        dane.rezerwy_na_zobowiazania = bilans_dict.get("Pasywa_B_1")
+        # Konwencja: wszystkie jako krótkoterminowe (ZD = 0 umownie; WZD = b/d)
         dane.zobowiazania_krotkoterminowe = dane.zobowiazania_ogolem
         dane.zobowiazania_dlugoterminowe = Decimal("0") if dane.zobowiazania_ogolem else None
         dane.zobowiazania_krotkoterminowe_poprz = bilans_poprz_dict.get("Pasywa_B")
 
     elif typ_jednostki == "Mala":
-        # Jednostka Mała
         dane.rezerwy_na_zobowiazania = bilans_dict.get("Pasywa_B_I")
         dane.zobowiazania_dlugoterminowe = bilans_dict.get("Pasywa_B_II")
         dane.zobowiazania_krotkoterminowe = bilans_dict.get("Pasywa_B_III")
         dane.zobowiazania_krotkoterminowe_poprz = bilans_poprz_dict.get("Pasywa_B_III")
+        # XSD Mała: B.III.b "z tytułu dostaw i usług"
+        dane.zobowiazania_handlowe = bilans_dict.get("Pasywa_B_III_B")
+        dane.zobowiazania_handlowe_poprz = bilans_poprz_dict.get("Pasywa_B_III_B")
 
         zd = dane.zobowiazania_dlugoterminowe or Decimal("0")
         zk = dane.zobowiazania_krotkoterminowe or Decimal("0")
@@ -1866,19 +2009,20 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
                                                dane.zobowiazania_krotkoterminowe is not None) else None
 
     else:  # Inna
-        # Jednostka Inna - pełna struktura
         dane.rezerwy_na_zobowiazania = bilans_dict.get("Pasywa_B_I")
         dane.zobowiazania_dlugoterminowe = bilans_dict.get("Pasywa_B_II")
         dane.zobowiazania_krotkoterminowe = bilans_dict.get("Pasywa_B_III")
         dane.zobowiazania_krotkoterminowe_poprz = bilans_poprz_dict.get("Pasywa_B_III")
 
-        # Zobowiązania wobec jednostek powiązanych
-        zjp_dt = bilans_dict.get("Pasywa_B_III_1_a") or Decimal("0")
-        zjp_kt = bilans_dict.get("Pasywa_B_III_2_a") or Decimal("0")
-        dane.zobowiazania_wobec_jedn_powiazanych = zjp_dt + zjp_kt if (
-            bilans_dict.get("Pasywa_B_III_1_a") is not None or
-            bilans_dict.get("Pasywa_B_III_2_a") is not None
-        ) else None
+        # Zobowiązania wobec jednostek powiązanych (XSD Inna):
+        # B.II.1 (długoterminowe) + B.III.1 (krótkoterminowe).
+        dane.zobowiazania_wobec_jedn_powiazanych = _suma_opcjonalna(
+            [bilans_dict.get("Pasywa_B_II_1"), bilans_dict.get("Pasywa_B_III_1")])
+
+        # Zobowiązania z tytułu dostaw i usług: B.III.1.a + B.III.2.a + B.III.3.d
+        kody_handlowe = ("Pasywa_B_III_1_A", "Pasywa_B_III_2_A", "Pasywa_B_III_3_D")
+        dane.zobowiazania_handlowe = _suma_opcjonalna([bilans_dict.get(k) for k in kody_handlowe])
+        dane.zobowiazania_handlowe_poprz = _suma_opcjonalna([bilans_poprz_dict.get(k) for k in kody_handlowe])
 
         zd = dane.zobowiazania_dlugoterminowe or Decimal("0")
         zk = dane.zobowiazania_krotkoterminowe or Decimal("0")
@@ -1886,29 +2030,31 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
                                                dane.zobowiazania_krotkoterminowe is not None) else None
 
     # =========================================================================
-    # MAPOWANIE RZiS - różne struktury dla różnych typów jednostek
+    # MAPOWANIE RZiS
     # =========================================================================
+    g = rzis_dict.get
+
     if typ_jednostki == "Mikro":
-        # Jednostka Mikro - uproszczony RZiS
-        # A = Przychody, B = Koszty, C = Pozostałe przychody, D = Pozostałe koszty
-        # E = Podatek dochodowy, F = Zysk/strata netto
-        # Koszty (B) i pozostałe koszty (D) są w XML e-sprawozdań kwotami
-        # DODATNIMI (F = A - B + C - D - E). Wcześniejsza wersja zakładała, że
-        # B jest ujemne i liczyła A + B - dawało to wynik ze sprzedaży
-        # zawyżony o dwukrotność kosztów (np. +695 tys. zł zamiast -79 tys. zł),
-        # a w konsekwencji fałszywie dobre modele dyskryminacyjne i ROp > 200%.
-        # abs() zabezpiecza przed plikami, w których koszty podano ze znakiem minus.
-        dane.przychody_netto_ze_sprzedazy = rzis_dict.get("A")
-        koszty = rzis_dict.get("B")
+        # Jednostka Mikro - uproszczony RZiS (XSD): A przychody, B koszty
+        # (B_I amortyzacja), C pozostałe przychody i zyski, D pozostałe koszty
+        # i straty, E podatek, F zysk/strata netto (G - wynik dla jednostek
+        # z art. 3 ust. 1a pkt 2 UoR).
+        # Koszty (B, D) są w XML kwotami DODATNIMI (F = A - B + C - D - E);
+        # abs() zabezpiecza przed plikami, w których podano je ze znakiem minus.
+        dane.przychody_netto_ze_sprzedazy = g("A")
+        koszty = g("B")
         dane.koszty_dzialalnosci_operacyjnej = abs(koszty) if koszty is not None else None
         if dane.przychody_netto_ze_sprzedazy is not None and dane.koszty_dzialalnosci_operacyjnej is not None:
             dane.wynik_ze_sprzedazy = dane.przychody_netto_ze_sprzedazy - dane.koszty_dzialalnosci_operacyjnej
-        dane.pozostale_przychody_operacyjne = rzis_dict.get("C")
-        pk = rzis_dict.get("D")
+        dane.pozostale_przychody_operacyjne = g("C")
+        pk = g("D")
         dane.pozostale_koszty_operacyjne = abs(pk) if pk is not None else None
-        dane.podatek_dochodowy = rzis_dict.get("E")
-        dane.zysk_strata_netto = rzis_dict.get("F")
-        # Wynik z działalności operacyjnej (przybliżenie): WS + C - D
+        dane.podatek_dochodowy = g("E")
+        dane.zysk_strata_netto = g("F") if g("F") is not None else g("G")
+        am = g("B_I")
+        dane.amortyzacja = abs(am) if am is not None else None
+        # Wynik "z działalności operacyjnej" (przybliżenie): WS + C - D.
+        # Uwaga: C i D w Mikro obejmują też przychody/koszty finansowe.
         if dane.wynik_ze_sprzedazy is not None:
             wdo = dane.wynik_ze_sprzedazy
             if dane.pozostale_przychody_operacyjne is not None:
@@ -1916,27 +2062,45 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
             if dane.pozostale_koszty_operacyjne is not None:
                 wdo -= dane.pozostale_koszty_operacyjne
             dane.wynik_z_dzialalnosci_operacyjnej = wdo
+        # Wynik brutto = netto + podatek
+        if dane.zysk_strata_netto is not None:
+            dane.zysk_strata_brutto = dane.zysk_strata_netto + (dane.podatek_dochodowy or Decimal("0"))
 
-    elif typ_jednostki == "Mala":
-        # Jednostka Mała - RZiS 10-pozycyjny (A-J). W odróżnieniu od Jednostki
-        # Innej NIE ma osobnej pozycji "zysk z działalności operacyjnej": po
-        # poz. C (zysk ze sprzedaży) następują od razu D/E (pozostała działalność
-        # operacyjna), F/G (działalność finansowa), a zysk brutto to poz. H.
-        dane.przychody_netto_ze_sprzedazy = rzis_dict.get("A")
-        dane.koszty_dzialalnosci_operacyjnej = rzis_dict.get("B")
-        dane.wynik_ze_sprzedazy = rzis_dict.get("C")
-        dane.pozostale_przychody_operacyjne = rzis_dict.get("D")
-        dane.pozostale_koszty_operacyjne = rzis_dict.get("E")
-        dane.przychody_finansowe = rzis_dict.get("F")
-        dane.koszty_finansowe = rzis_dict.get("G")
-        dane.zysk_strata_brutto = rzis_dict.get("H")
-        dane.podatek_dochodowy = rzis_dict.get("I")
-        dane.zysk_strata_netto = rzis_dict.get("J")
+        # Kontrola spójności: A - |B| + C - |D| - E = F
+        if dane.wynik_z_dzialalnosci_operacyjnej is not None and dane.zysk_strata_netto is not None:
+            wyliczony = dane.wynik_z_dzialalnosci_operacyjnej - (dane.podatek_dochodowy or Decimal("0"))
+            roznica = wyliczony - dane.zysk_strata_netto
+            if abs(roznica) > TOLERANCJA_SPOJNOSCI:
+                dane.uwagi.append(
+                    f"NIESPÓJNOŚĆ RZiS: A - |B| + C - |D| - E = {_fmt_kwota(wyliczony)}, "
+                    f"a wykazany wynik netto (F) = {_fmt_kwota(dane.zysk_strata_netto)} "
+                    f"(różnica {_fmt_kwota(roznica)}) - zweryfikuj dane źródłowe.")
+        dane.uwagi.append(UWAGA_MIKRO)
 
-        # Wynik z działalności operacyjnej nie jest osobną pozycją RZiS Małej -
-        # liczymy go: zysk ze sprzedaży + pozostałe przychody operacyjne
-        # - pozostałe koszty operacyjne (kwoty kosztów są dodatnie w XML).
-        if dane.wynik_ze_sprzedazy is not None:
+    else:
+        klucz = (typ_jednostki if typ_jednostki == "Mala" else "Inna",
+                 wariant if wariant == "kalkulacyjny" else "porownawczy")
+        m = RZIS_MAP[klucz]
+        dane.przychody_netto_ze_sprzedazy = g(m["PS"])
+        dane.koszty_dzialalnosci_operacyjnej = _suma_opcjonalna([g(k) for k in m["KDO"]])
+        dane.wynik_ze_sprzedazy = g(m["WS"])
+        dane.pozostale_przychody_operacyjne = g(m["PPO"])
+        dane.pozostale_koszty_operacyjne = g(m["PKO"])
+        dane.przychody_finansowe = g(m["PF"])
+        dane.koszty_finansowe = g(m["KF"])
+        dane.zysk_strata_brutto = g(m["ZB"])
+        dane.podatek_dochodowy = g(m["PD"])
+        # Zysk netto WYŁĄCZNIE z właściwej pozycji (0 to wartość, nie brak)
+        dane.zysk_strata_netto = g(m["ZN"])
+        if m["AM"]:
+            dane.amortyzacja = g(m["AM"])
+        if m["KW"]:
+            dane.koszt_wytworzenia_sprzedanych = g(m["KW"])
+
+        if m["WDO"]:
+            dane.wynik_z_dzialalnosci_operacyjnej = g(m["WDO"])
+        elif dane.wynik_ze_sprzedazy is not None:
+            # Mała nie ma osobnej pozycji - WS + PPO - PKO (koszty dodatnie w XML)
             wdo = dane.wynik_ze_sprzedazy
             if dane.pozostale_przychody_operacyjne is not None:
                 wdo += dane.pozostale_przychody_operacyjne
@@ -1944,43 +2108,21 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
                 wdo -= dane.pozostale_koszty_operacyjne
             dane.wynik_z_dzialalnosci_operacyjnej = wdo
 
-        # Awaryjnie: zysk netto w innych wariantach (kalkulacyjny / z notą).
-        if dane.zysk_strata_netto is None:
-            dane.zysk_strata_netto = (
-                rzis_dict.get("L") or rzis_dict.get("N") or rzis_dict.get("O")
-            )
-
-    else:  # Inna - RZiS 11-pozycyjny (A-K) z osobną poz. F "zysk z działalności
-        # operacyjnej"; zysk brutto = poz. I, podatek = J, zysk netto = K.
-        dane.przychody_netto_ze_sprzedazy = rzis_dict.get("A")
-        dane.koszty_dzialalnosci_operacyjnej = rzis_dict.get("B")
-        dane.wynik_ze_sprzedazy = rzis_dict.get("C")
-        dane.pozostale_przychody_operacyjne = rzis_dict.get("D")
-        dane.pozostale_koszty_operacyjne = rzis_dict.get("E")
-        dane.wynik_z_dzialalnosci_operacyjnej = rzis_dict.get("F")
-        dane.przychody_finansowe = rzis_dict.get("G")
-        dane.koszty_finansowe = rzis_dict.get("H")
-        dane.zysk_strata_brutto = rzis_dict.get("I")
-        dane.podatek_dochodowy = rzis_dict.get("J")
-        dane.zysk_strata_netto = rzis_dict.get("K")
-
-        # Alternatywne mapowanie dla wariantu kalkulacyjnego lub innych wariantów
-        # Zysk netto może być pod K, L (gdy jest nota podatkowa), N lub O
-        if dane.zysk_strata_netto is None:
-            dane.zysk_strata_netto = (
-                rzis_dict.get("L") or  # z notą podatkową
-                rzis_dict.get("O") or  # wariant kalkulacyjny z notą
-                rzis_dict.get("N")     # wariant kalkulacyjny
-            )
-
-    # =========================================================================
-    # AMORTYZACJA
-    # =========================================================================
-    # Amortyzacja - pozycja B.I rachunku zysków i strat w wariancie
-    # porównawczym (dotyczy Jednostki Małej i Innej). W wariancie
-    # kalkulacyjnym amortyzacja nie jest odrębną pozycją RZiS.
-    if sprawozdanie.metadane.wariant_rzis == "porownawczy":
-        dane.amortyzacja = rzis_dict.get("B_I")
+        # Kontrola spójności: brutto - podatek - obowiązkowe zmniejszenia = netto
+        if dane.zysk_strata_brutto is not None and dane.zysk_strata_netto is not None:
+            oz = g(m["OZ"]) if m["OZ"] else None
+            wyliczony = (dane.zysk_strata_brutto - (dane.podatek_dochodowy or Decimal("0"))
+                         - (oz or Decimal("0")))
+            roznica = wyliczony - dane.zysk_strata_netto
+            if abs(roznica) > TOLERANCJA_SPOJNOSCI:
+                opis_oz = f" - {m['OZ']}" if m["OZ"] else ""
+                dane.uwagi.append(
+                    f"NIESPÓJNOŚĆ RZiS: {m['ZB']} - {m['PD']}{opis_oz} = {_fmt_kwota(wyliczony)}, "
+                    f"a wykazany wynik netto ({m['ZN']}) = {_fmt_kwota(dane.zysk_strata_netto)} "
+                    f"(różnica {_fmt_kwota(roznica)}) - zweryfikuj dane źródłowe.")
+        elif dane.zysk_strata_netto is None and rzis_dict:
+            dane.uwagi.append(
+                f"Brak pozycji wyniku netto ({m['ZN']}) w RZiS - wskaźniki oparte na zysku netto nieobliczone.")
 
     # =========================================================================
     # RACHUNEK PRZEPŁYWÓW PIENIĘŻNYCH (jeśli dostępny)

@@ -378,6 +378,18 @@ class SFParser:
                     elif not nip:  # ustaw tylko jeśli jeszcze nie mamy NIP
                         nip = text
 
+            # Schemat 1-0: identyfikatory w elementach potomnych P_1C/P_1D,
+            # np. <P_1C><dtsf:KRS>0000544708</dtsf:KRS></P_1C>. Bierzemy
+            # pierwsze wystąpienie (nagłówek poprzedza treść sprawozdania).
+            elif localname == "KRS" and elem.text and not krs:
+                text = elem.text.strip()
+                if len(text) == 10 and text.isdigit():
+                    krs = text
+            elif localname == "NIP" and elem.text and not nip:
+                text = elem.text.strip().replace("-", "")
+                if len(text) == 10 and text.isdigit():
+                    nip = text
+
             # REGON
             elif localname == "REGON" and elem.text:
                 regon = elem.text.strip()

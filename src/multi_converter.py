@@ -117,6 +117,7 @@ class MultiYearConverter:
             self.wb.create_sheet("RZiS"),
             "RACHUNEK ZYSKÓW I STRAT - UJĘCIE WIELOLETNIE",
             [(None, lambda s: s.rzis)],
+            rzis=True,
         )
 
         if any(s.nota_podatkowa for s in self.reports):
@@ -171,13 +172,15 @@ class MultiYearConverter:
         if len(warianty) > 1:
             o.append(
                 "UWAGA: różne warianty RZiS (porównawczy / kalkulacyjny) - "
-                "pozycje rachunku zyskow i strat moga sie roznic miedzy latami."
+                "RZiS prezentowany w osobnych blokach dla każdego wariantu; "
+                "wiersze bloków nie są porównywalne."
             )
         typy = {s.metadane.typ_jednostki for s in self.reports}
         if len(typy) > 1:
             o.append(
                 f"UWAGA: różne typy jednostki ({', '.join(sorted(typy))}) - "
-                "zakres prezentowanych pozycji moze sie roznic miedzy latami."
+                "bilans, RZiS i pozostałe zestawienia prezentowane w osobnych blokach "
+                "dla każdego typu (te same oznaczenia pozycji mają różną treść)."
             )
         lata = [_rok(s) for s in self.reports]
         duplikaty = sorted({y for y in lata if lata.count(y) > 1})
@@ -210,11 +213,13 @@ class MultiYearConverter:
 
     # ----------------------------------------------------------- łączenie danych
 
-    def _merge_section(self, getter):
+    def _merge_section(self, getter, reports=None):
         """Łączy jedną sekcję (np. bilans_aktywa) ze wszystkich sprawozdań.
 
         Args:
             getter: funkcja Sprawozdanie -> list[PozycjaFinansowa] | None
+            reports: podzbiór sprawozdań (domyślnie wszystkie) - używany, gdy
+                     grupa ma różne typy jednostek / warianty RZiS (osobne bloki)
 
         Returns:
             tuple (lata, wiersze):
@@ -222,14 +227,15 @@ class MultiYearConverter:
               wiersze - list[dict] z kluczami: kod, opis, poziom, sekcja,
                         values (dict rok->Decimal), only_old (bool)
         """
+        reps = reports if reports is not None else self.reports
         # Kolejność wierszy bierzemy z najnowszego sprawozdania (wzorzec).
-        wzorzec = getter(self.reports[-1]) or []
+        wzorzec = getter(reps[-1]) or []
         kody_wzorca = [p.kod for p in wzorzec]
         widziane = set(kody_wzorca)
 
         # Pozycje obecne tylko w starszych sprawozdaniach (dopisywane na końcu).
         kody_dodatkowe = []
-        for spr in self.reports:
+        for spr in reps:
             for p in getter(spr) or []:
                 if p.kod not in widziane:
                     widziane.add(p.kod)
@@ -237,7 +243,7 @@ class MultiYearConverter:
 
         # Opis i poziom - z najnowszego sprawozdania, które zawiera dany kod.
         meta = {}
-        for spr in reversed(self.reports):
+        for spr in reversed(reps):
             for p in getter(spr) or []:
                 if p.kod not in meta:
                     meta[p.kod] = (p.opis, p.poziom, p.sekcja)
@@ -246,14 +252,14 @@ class MultiYearConverter:
         values = {kod: {} for kod in wszystkie_kody}
 
         # Najpierw dane porównawcze (rok-1) - niższy priorytet.
-        for spr in self.reports:
+        for spr in reps:
             rok = _rok(spr)
             for p in getter(spr) or []:
                 if p.kwota_poprzednia is not None:
                     values[p.kod].setdefault(rok - 1, p.kwota_poprzednia)
 
         # Następnie dane bieżące - zawsze nadpisują.
-        for spr in self.reports:
+        for spr in reps:
             rok = _rok(spr)
             for p in getter(spr) or []:
                 if p.kwota_biezaca is not None:
@@ -341,13 +347,47 @@ class MultiYearConverter:
             ws.column_dimensions[col].width = 20
         ws.column_dimensions['G'].width = 48
 
-    def _create_financial_sheet(self, ws, tytul, bloki):
+    TYP_OPIS = {"Mikro": "jednostka mikro", "Mala": "jednostka mała", "Inna": "jednostka inna"}
+
+    def _segmenty(self, rzis: bool = False) -> list:
+        """Dzieli sprawozdania na segmenty o jednakowej strukturze pozycji.
+
+        Kody pozycji (np. RZiS "F", bilans "Aktywa_B_1") znaczą co innego
+        w różnych typach jednostek, a w RZiS także w różnych wariantach -
+        wiersze można łączyć po kodzie tylko w obrębie jednej struktury.
+
+        Returns:
+            list[tuple[str|None, list[Sprawozdanie]]] - (nagłówek bloku lub
+            None dla grupy jednorodnej, sprawozdania segmentu rosnąco po roku)
+        """
+        def sygn(s):
+            m = s.metadane
+            return (m.typ_jednostki, m.wariant_rzis) if rzis else (m.typ_jednostki,)
+
+        segmenty = {}
+        for s in self.reports:
+            segmenty.setdefault(sygn(s), []).append(s)
+        if len(segmenty) == 1:
+            return [(None, self.reports)]
+        wynik = []
+        for syg, reps in segmenty.items():
+            lata = sorted({_rok(s) for s in reps})
+            opis = self.TYP_OPIS.get(syg[0], syg[0])
+            if rzis:
+                opis += f", wariant {'kalkulacyjny' if syg[1] == 'kalkulacyjny' else 'porównawczy'}"
+            naglowek = (f"BLOK: {opis} - sprawozdania za lata {', '.join(map(str, lata))} "
+                        "(wiersze nieporównywalne z innymi blokami)")
+            wynik.append((naglowek, reps))
+        return wynik
+
+    def _create_financial_sheet(self, ws, tytul, bloki, rzis: bool = False):
         """Tworzy arkusz finansowy z kolumnami lat.
 
         Args:
             ws: arkusz
             tytul: tytuł arkusza
             bloki: list[tuple[str|None, getter]] - podtytuł sekcji + funkcja getter
+            rzis: True dla RZiS - segmentacja także po wariancie RZiS
         """
         firma = self.reports[-1].dane_firmy
 
@@ -360,8 +400,14 @@ class MultiYearConverter:
         ws['A3'].font = self.HEADER_FONT
         ws['B3'] = firma.nip or "-"
 
-        merged = [(sub, *self._merge_section(getter)) for sub, getter in bloki]
-        lata = sorted({rok for _, lata_b, _ in merged for rok in lata_b})
+        # Grupa jednorodna: jeden segment (bez nagłówka) - wynik jak dotąd.
+        # Grupa mieszana: osobny blok wierszy dla każdej struktury pozycji.
+        merged = []
+        for naglowek, reps in self._segmenty(rzis):
+            for i, (sub, getter) in enumerate(bloki):
+                lata_b, wiersze = self._merge_section(getter, reps)
+                merged.append((sub, lata_b, wiersze, naglowek if i == 0 else None))
+        lata = sorted({rok for _, lata_b, _, _ in merged for rok in lata_b})
 
         if not lata:
             ws['A5'] = "(brak danych w tej sekcji)"
@@ -379,7 +425,12 @@ class MultiYearConverter:
             c.alignment = Alignment(horizontal='right')
 
         row = header_row + 1
-        for sub, _lata_b, wiersze in merged:
+        for sub, _lata_b, wiersze, naglowek in merged:
+            if naglowek:
+                c = ws.cell(row=row, column=1, value=naglowek)
+                c.font = self.WARN_FONT
+                c.fill = self.HEADER_FILL
+                row += 1
             if sub:
                 ws.cell(row=row, column=1, value=sub).font = self.SUBTITLE_FONT
                 row += 1
@@ -422,12 +473,15 @@ class MultiYearConverter:
         )
 
         per_report = []  # list[tuple[rok, list[WynikWskaznika]]]
+        uwagi = []       # list[tuple[rok, str]] - niespójności / ograniczenia danych
         for spr in self.reports:
             try:
                 dane = extract_financial_data_from_sprawozdanie(spr)
                 wyniki = KalkulatorWskaznikow(dane).oblicz_wszystkie()
-            except Exception:
+                uwagi.extend((_rok(spr), u) for u in dane.uwagi)
+            except Exception as e:
                 wyniki = []
+                uwagi.append((_rok(spr), f"NIESPÓJNOŚĆ: nie udało się obliczyć wskaźników ({e})."))
             per_report.append((_rok(spr), wyniki))
 
         ws['A1'] = "ANALIZA WSKAŹNIKOWA - UJĘCIE WIELOLETNIE"
@@ -489,6 +543,24 @@ class MultiYearConverter:
             ws.cell(row=row, column=6 + n, value=wz.zrodlo)
             row += 1
 
+        # Uwagi do danych (niespójności RZiS, ograniczenia jednostek mikro) -
+        # identyczne uwagi z kilku lat scalane w jeden wiersz.
+        if uwagi:
+            scalone = {}
+            for rok, u in uwagi:
+                scalone.setdefault(u, []).append(rok)
+            row += 1
+            ws.cell(row=row, column=1, value="UWAGI DO DANYCH").font = self.WARN_FONT
+            row += 1
+            for u, lata_u in scalone.items():
+                c = ws.cell(row=row, column=1,
+                            value=f"[{', '.join(map(str, sorted(set(lata_u))))}] {u}")
+                c.font = Font(bold=u.startswith("NIESPÓJNOŚĆ"), color="CC0000")
+                c.alignment = Alignment(wrap_text=True, vertical="top")
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6 + n)
+                ws.row_dimensions[row].height = 45
+                row += 1
+
         # Legenda ocen.
         row += 1
         ws.cell(row=row, column=1, value="LEGENDA OCEN").font = self.SUBTITLE_FONT
@@ -545,9 +617,16 @@ class MultiYearConverter:
         ]
         wszystkie = []  # list[tuple[label, wiersz]]
         for label, getter in getters:
-            _lata, wiersze = self._merge_section(getter)
-            for w in wiersze:
-                wszystkie.append((label, w))
+            segmenty = self._segmenty(rzis=(label == "RZiS"))
+            for _naglowek, reps in segmenty:
+                etykieta = label
+                if len(segmenty) > 1:
+                    m = reps[0].metadane
+                    etykieta = f"{label} [{m.typ_jednostki}" + (
+                        f"/{m.wariant_rzis}]" if label == "RZiS" else "]")
+                _lata, wiersze = self._merge_section(getter, reps)
+                for w in wiersze:
+                    wszystkie.append((etykieta, w))
 
         lata = sorted({rok for _, w in wszystkie for rok in w['values']})
         naglowki = ["sekcja", "kod", "opis"] + [str(rok) for rok in lata]
