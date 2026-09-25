@@ -1481,29 +1481,36 @@ class KalkulatorWskaznikow:
         ))
 
     def _oblicz_model_gajdki_stosa(self):
-        """Model J. Gajdki i D. Stosa (1996)."""
-        # Z = 0,7732059 - 0,0856425×X₁ - 0,0007747×X₂ + 0,9220985×X₃ + 0,6535995×X₄ - 0,594687×X₅
-        # X₁ = Przychody ze sprzedaży / Aktywa ogółem
-        # X₂ = (Zobowiązania krótkoterminowe / Koszt wytworzenia) × 360
-        # X₃ = Zysk netto / Aktywa ogółem
-        # X₄ = Zysk netto / Przychody ze sprzedaży
+        """Model J. Gajdki i D. Stosa (1996).
+
+        Wersja zweryfikowana 2026-09-25 ze źródłami (m.in. UZ, UE Wrocław, vault Wiedza):
+        współczynnik przy X₂ jest DODATNI, X₄ liczony z zysku BRUTTO, X₂ w dniach (365),
+        X₁-X₃ na przeciętnym stanie aktywów / zobowiązań KT.
+        """
+        # Z = 0,7732059 - 0,0856425×X₁ + 0,0007747×X₂ + 0,9220985×X₃ + 0,6535995×X₄ - 0,594687×X₅
+        # X₁ = Przychody ze sprzedaży / Przeciętny stan aktywów
+        # X₂ = (Przeciętny stan zobowiązań krótkoterminowych × 365) / Koszt wytworzenia produkcji sprzedanej
+        # X₃ = Zysk netto / Przeciętny stan aktywów
+        # X₄ = Zysk brutto / Przychody ze sprzedaży netto
         # X₅ = Zobowiązania ogółem / Aktywa ogółem
 
         try:
-            x1 = self._safe_divide(self.dane.przychody_netto_ze_sprzedazy, self.dane.aktywa_ogolem)
+            srednie_aktywa = self.dane.srednia_suma_bilansowa or self.dane.aktywa_ogolem
+            srednie_zk = self.dane.srednie_zobowiazania_krotkoterm or self.dane.zobowiazania_krotkoterminowe
+            x1 = self._safe_divide(self.dane.przychody_netto_ze_sprzedazy, srednie_aktywa)
 
             koszt = self.dane.koszt_wytworzenia_sprzedanych or self.dane.koszty_dzialalnosci_operacyjnej
-            x2 = self._safe_divide(self.dane.zobowiazania_krotkoterminowe, koszt)
+            x2 = self._safe_divide(srednie_zk, koszt)
             if x2 is not None:
-                x2 = x2 * Decimal("360")
+                x2 = x2 * Decimal("365")
 
-            x3 = self._safe_divide(self.dane.zysk_strata_netto, self.dane.aktywa_ogolem)
-            x4 = self._safe_divide(self.dane.zysk_strata_netto, self.dane.przychody_netto_ze_sprzedazy)
+            x3 = self._safe_divide(self.dane.zysk_strata_netto, srednie_aktywa)
+            x4 = self._safe_divide(self.dane.zysk_strata_brutto, self.dane.przychody_netto_ze_sprzedazy)
             x5 = self._safe_divide(self.dane.zobowiazania_ogolem, self.dane.aktywa_ogolem)
 
             if all(v is not None for v in [x1, x2, x3, x4, x5]):
                 wartosc = (Decimal("0.7732059") -
-                          Decimal("0.0856425") * x1 -
+                          Decimal("0.0856425") * x1 +
                           Decimal("0.0007747") * x2 +
                           Decimal("0.9220985") * x3 +
                           Decimal("0.6535995") * x4 -
@@ -1530,7 +1537,7 @@ class KalkulatorWskaznikow:
             wartosc_str=self._format_ratio(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
-            wzor="0,773 - 0,086×X₁ - 0,0008×X₂ + 0,922×X₃ + 0,654×X₄ - 0,595×X₅",
+            wzor="0,7732059 - 0,0856425×X₁ + 0,0007747×X₂ + 0,9220985×X₃ + 0,6535995×X₄ - 0,594687×X₅",
             optimum="> 0,45",
             wartosc_krytyczna="≤ 0,45",
             zrodlo="J. Gajdka, D. Stos (1996)",
@@ -1585,12 +1592,14 @@ class KalkulatorWskaznikow:
         if wartosc is None:
             ocena = OcenaWskaznika.BRAK_DANYCH
             interpretacja = "Brak wystarczających danych do obliczenia modelu."
-        elif wartosc < Decimal("0"):
+        elif wartosc <= Decimal("-0.42895"):
             ocena = OcenaWskaznika.KRYTYCZNA
-            interpretacja = "ALARM: Model wskazuje na zagrożenie upadłością (Z < 0)."
+            interpretacja = "ALARM: Model wskazuje na zagrożenie upadłością (Z ≤ -0,42895)."
         else:
             ocena = OcenaWskaznika.OPTYMALNA
-            interpretacja = "Model wskazuje na brak zagrożenia upadłością (Z ≥ 0)."
+            interpretacja = "Model wskazuje na brak zagrożenia upadłością (Z > -0,42895)."
+        interpretacja += (" Uwaga: w literaturze funkcjonuje kilka wersji modelu Hadasik "
+                          "(różne współczynniki i progi) - wynik traktować pomocniczo.")
 
         self.wyniki.append(WynikWskaznika(
             nazwa="Model D. Hadasik",
@@ -1599,16 +1608,17 @@ class KalkulatorWskaznikow:
             wartosc_str=self._format_ratio(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
-            wzor="0,336×X₁ - 0,712×X₂ - 2,472×X₃ + 1,464×X₄ + 0,002×X₅ - 0,014×X₆ + 0,002×X₇ + 2,593",
-            optimum="≥ 0",
-            wartosc_krytyczna="< 0",
-            zrodlo="D. Hadasik (1998)",
+            wzor="0,335969×X₁ - 0,71245×X₂ - 2,4716×X₃ + 1,46434×X₄ + 0,00246069×X₅ - 0,0138937×X₆ + 0,00243387×X₇ + 2,59323",
+            optimum="> -0,42895",
+            wartosc_krytyczna="≤ -0,42895",
+            zrodlo="D. Hadasik (1998); wersja jak w arkuszu wzorcowym kancelarii",
         ))
 
     def _oblicz_model_maczynskiej(self):
         """Model E. Mączyńskiej (1994)."""
         # Z = 1,50×X₁ + 0,08×X₂ + 10,00×X₃ + 5,00×X₄ + 0,30×X₅ + 0,10×X₆
-        # X₁ = Nadwyżka pieniężna / Zobowiązania ogółem
+        # X₁ = (Zysk brutto + Amortyzacja) / Zobowiązania ogółem  (zweryfikowane 2026-09-25;
+        #       wcześniej: zysk netto + amortyzacja)
         # X₂ = Aktywa ogółem / Zobowiązania ogółem
         # X₃ = Zysk brutto / Aktywa ogółem
         # X₄ = Zysk brutto / Przychody ze sprzedaży
@@ -1616,7 +1626,10 @@ class KalkulatorWskaznikow:
         # X₆ = Przychody ze sprzedaży / Aktywa ogółem
 
         try:
-            x1 = self._safe_divide(self.dane.nadwyzka_pieniezna, self.dane.zobowiazania_ogolem)
+            zb_am = None
+            if self.dane.zysk_strata_brutto is not None:
+                zb_am = self.dane.zysk_strata_brutto + (self.dane.amortyzacja or Decimal("0"))
+            x1 = self._safe_divide(zb_am, self.dane.zobowiazania_ogolem)
             x2 = self._safe_divide(self.dane.aktywa_ogolem, self.dane.zobowiazania_ogolem)
             x3 = self._safe_divide(self.dane.zysk_strata_brutto, self.dane.aktywa_ogolem)
             x4 = self._safe_divide(self.dane.zysk_strata_brutto, self.dane.przychody_netto_ze_sprzedazy)
@@ -1716,33 +1729,38 @@ class KalkulatorWskaznikow:
         ))
 
     def _oblicz_model_altmana(self):
-        """Model Altmana (1968) - wersja dla firm nienotowanych."""
-        # Z = 1,2×X₁ + 1,4×X₂ + 3,3×X₃ + 0,6×X₄ + 1,0×X₅
+        """Model Altmana Z' (1983) - spółki nienotowane.
+
+        Do 2026-09-25 liczony był współczynnikami wersji 1968 (spółki giełdowe, X₄ z wartością
+        rynkową kapitału) przy opisie „dla firm nienotowanych”. Z' używa księgowej wartości
+        kapitału własnego w X₄ i ma inne progi.
+        """
+        # Z' = 0,717×X₁ + 0,847×X₂ + 3,107×X₃ + 0,420×X₄ + 0,998×X₅
         # X₁ = Kapitał pracujący / Aktywa ogółem
-        # X₂ = Zysk zatrzymany / Aktywa ogółem (przybliżenie: Kapitał własny - Kapitał podstawowy)
-        # X₃ = EBIT / Aktywa ogółem (przybliżenie: Wynik z działalności operacyjnej)
-        # X₄ = Kapitał własny / Zobowiązania ogółem
+        # X₂ = Zysk zatrzymany (skumulowany) / Aktywa ogółem
+        #      (Mała/Inna: A.V + A.VI; Mikro: kapitał własny - kapitał podstawowy)
+        # X₃ = EBIT / Aktywa ogółem (przybliżenie: wynik z działalności operacyjnej)
+        # X₄ = Księgowa wartość kapitału własnego / Zobowiązania ogółem
         # X₅ = Przychody ze sprzedaży / Aktywa ogółem
 
         try:
             x1 = self._safe_divide(self.dane.kapital_pracujacy, self.dane.aktywa_ogolem)
 
-            # X₂ - Zysk zatrzymany: jeśli nie mamy, użyj kapitału własnego jako przybliżenia
-            zysk_zatrz = self.dane.zysk_zatrzymany or self.dane.kapital_wlasny
+            zysk_zatrz = self.dane.zysk_zatrzymany
+            if zysk_zatrz is None:
+                zysk_zatrz = self.dane.kapital_wlasny  # ostateczność: brak rozbicia kapitału
             x2 = self._safe_divide(zysk_zatrz, self.dane.aktywa_ogolem)
 
-            # X₃ - EBIT: używamy wyniku z działalności operacyjnej
             x3 = self._safe_divide(self.dane.wynik_z_dzialalnosci_operacyjnej, self.dane.aktywa_ogolem)
-
             x4 = self._safe_divide(self.dane.kapital_wlasny, self.dane.zobowiazania_ogolem)
             x5 = self._safe_divide(self.dane.przychody_netto_ze_sprzedazy, self.dane.aktywa_ogolem)
 
             if all(v is not None for v in [x1, x2, x3, x4, x5]):
-                wartosc = (Decimal("1.2") * x1 +
-                          Decimal("1.4") * x2 +
-                          Decimal("3.3") * x3 +
-                          Decimal("0.6") * x4 +
-                          Decimal("1.0") * x5)
+                wartosc = (Decimal("0.717") * x1 +
+                          Decimal("0.847") * x2 +
+                          Decimal("3.107") * x3 +
+                          Decimal("0.420") * x4 +
+                          Decimal("0.998") * x5)
             else:
                 wartosc = None
         except Exception:
@@ -1751,27 +1769,28 @@ class KalkulatorWskaznikow:
         if wartosc is None:
             ocena = OcenaWskaznika.BRAK_DANYCH
             interpretacja = "Brak wystarczających danych do obliczenia modelu."
-        elif wartosc <= Decimal("1.8"):
+        elif wartosc < Decimal("1.23"):
             ocena = OcenaWskaznika.KRYTYCZNA
-            interpretacja = "ALARM: Bardzo wysokie zagrożenie upadłością (Z ≤ 1,8)."
-        elif wartosc < Decimal("3.0"):
+            interpretacja = "ALARM: Wysokie zagrożenie upadłością (Z' < 1,23)."
+        elif wartosc <= Decimal("2.90"):
             ocena = OcenaWskaznika.OSTRZEGAWCZA
-            interpretacja = "Strefa szara - nieokreślone ryzyko (1,8 < Z < 3,0)."
+            interpretacja = "Strefa szara - nieokreślone ryzyko (1,23 ≤ Z' ≤ 2,90)."
         else:
             ocena = OcenaWskaznika.OPTYMALNA
-            interpretacja = "Model wskazuje na niewielkie zagrożenie upadłością (Z ≥ 3,0)."
+            interpretacja = "Model wskazuje na niskie zagrożenie upadłością (Z' > 2,90)."
+        interpretacja += " Model zagraniczny - w warunkach polskich stosować pomocniczo."
 
         self.wyniki.append(WynikWskaznika(
-            nazwa="Model Altmana",
+            nazwa="Model Altmana Z' (spółki nienotowane)",
             skrot="FD_A",
             wartosc=wartosc,
             wartosc_str=self._format_ratio(wartosc),
             ocena=ocena,
             interpretacja=interpretacja,
-            wzor="1,2×X₁ + 1,4×X₂ + 3,3×X₃ + 0,6×X₄ + 1,0×X₅",
-            optimum="≥ 3,0",
-            wartosc_krytyczna="≤ 1,8",
-            zrodlo="E.I. Altman (1968)",
+            wzor="0,717×X₁ + 0,847×X₂ + 3,107×X₃ + 0,420×X₄ + 0,998×X₅",
+            optimum="> 2,90",
+            wartosc_krytyczna="< 1,23",
+            zrodlo="E.I. Altman (1983), wersja Z' dla spółek nienotowanych",
         ))
 
     def _oblicz_wilcox_gambler(self):
@@ -1983,6 +2002,17 @@ def extract_financial_data_from_sprawozdanie(sprawozdanie) -> DaneFinansowe:
     # =========================================================================
     dane.pasywa_ogolem = bilans_dict.get("Pasywa")
     dane.kapital_wlasny = bilans_dict.get("Pasywa_A")
+    # Zysk zatrzymany (skumulowany) dla Altmana Z': zysk z lat ubiegłych + zysk netto
+    # (Mała/Inna: A.V + A.VI). Mikro nie wyodrębnia tych pozycji - przybliżenie:
+    # kapitał własny - kapitał podstawowy (A - A.1).
+    if typ_jednostki == "Mikro":
+        kp = bilans_dict.get("Pasywa_A_1")
+        if dane.kapital_wlasny is not None:
+            dane.zysk_zatrzymany = dane.kapital_wlasny - (kp or Decimal("0"))
+    else:
+        zlu, zn = bilans_dict.get("Pasywa_A_V"), bilans_dict.get("Pasywa_A_VI")
+        if zlu is not None or zn is not None:
+            dane.zysk_zatrzymany = (zlu or Decimal("0")) + (zn or Decimal("0"))
 
     if typ_jednostki == "Mikro":
         # Pasywa_B = "Zobowiązania i rezerwy na zobowiązania" (bez podziału

@@ -558,12 +558,12 @@ class XLSXConverter:
              "Wersja z 2-letnim wyprzedzeniem. Próg: Z>0"),
             ("Model A. Hołdy (FD_H)", "0,605 + 0,681×X₁ - 0,0196×X₂ + 0,157×X₃ + 0,00969×X₄ + 0,000672×X₅",
              "Progi: Z≥0,1 brak zagrożenia, Z≤-0,3 zagrożenie, strefa szara pomiędzy"),
-            ("Model Gajdki-Stosa (FD_GS)", "0,773 - 0,086×X₁ - 0,0008×X₂ + 0,922×X₃ + 0,654×X₄ - 0,595×X₅",
-             "Próg: Z>0,45 dobra kondycja"),
-            ("Model Hadasik (FD_HD)", "0,336×X₁ - 0,712×X₂ - 2,472×X₃ + 1,464×X₄ + 0,002×X₅ - 0,014×X₆ + 0,002×X₇ + 2,593",
-             "Model 7-zmiennowy. Próg: Z≥0 brak zagrożenia"),
+            ("Model Gajdki-Stosa (FD_GS)", "0,7732059 - 0,0856425×X₁ + 0,0007747×X₂ + 0,9220985×X₃ + 0,6535995×X₄ - 0,594687×X₅",
+             "X₁=PS/śrA, X₂=śrZK×365/KWPS, X₃=ZN/śrA, X₄=ZB/PS, X₅=ZO/A. Próg: Z>0,45 dobra kondycja"),
+            ("Model Hadasik (FD_HD)", "0,335969×X₁ - 0,71245×X₂ - 2,4716×X₃ + 1,46434×X₄ + 0,00246069×X₅ - 0,0138937×X₆ + 0,00243387×X₇ + 2,59323",
+             "Model 7-zmiennowy. Próg: Z>-0,42895 brak zagrożenia. W literaturze kilka wersji modelu - pomocniczo"),
             ("Model Mączyńskiej (FD_M)", "1,50×X₁ + 0,08×X₂ + 10,00×X₃ + 5,00×X₄ + 0,30×X₅ + 0,10×X₆",
-             "Progi: Z≥1 dobra kondycja, 0<Z<1 słaba, Z≤0 zagrożenie"),
+             "X₁=(ZB+Am)/ZO, X₂=A/ZO, X₃=ZB/A, X₄=ZB/PS, X₅=Zap/PS, X₆=PS/A. Progi: Z≥1 dobra kondycja, 0<Z<1 słaba, Z≤0 zagrożenie"),
             ("Model Wierzby (FD_W)", "3,26×X₁ + 2,16×X₂ + 0,30×X₃ + 0,69×X₄",
              "Próg: Z>0 dobra kondycja"),
         ]
@@ -581,8 +581,9 @@ class XLSXConverter:
         ws.cell(row=row, column=1).font = Font(bold=True, underline="single")
         row += 1
         objasnienia_modele_zagr = [
-            ("Model Altmana (FD_A)", "1,2×X₁ + 1,4×X₂ + 3,3×X₃ + 0,6×X₄ + 1,0×X₅",
-             "X₁=KP/A, X₂=ZZ/A, X₃=EBIT/A, X₄=KW/ZO, X₅=PS/A. Progi: Z≥3 bezpieczna, 1,8<Z<3 strefa szara, Z≤1,8 zagrożenie"),
+            ("Model Altmana Z' (FD_A)", "0,717×X₁ + 0,847×X₂ + 3,107×X₃ + 0,420×X₄ + 0,998×X₅",
+             "Wersja 1983 dla spółek nienotowanych. X₁=KP/A, X₂=zysk zatrzymany/A, X₃=EBIT/A, X₄=KW księgowy/ZO, X₅=PS/A. "
+             "Progi: Z'>2,90 niskie ryzyko, 1,23-2,90 strefa szara, Z'<1,23 zagrożenie"),
             ("Wilcox-Gambler (WL)", "ŚP + 0,70×Nal + 0,50×Zap + 0,50×Inne + 0,50×AT - ZK - ZD",
              "Wartość likwidacyjna majątku. WL>0 wypłacalność w ujęciu likwidacyjnym. "
              "Mikro: AO poza zapasami i należnościami (w tym gotówka) ujęte jako Inne AO w 50%"),
