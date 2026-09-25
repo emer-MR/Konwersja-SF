@@ -1,31 +1,38 @@
+# Wersje PRZYPIĘTE (2026-09-25) - stan z obrazu produkcyjnego, na którym aplikacja
+# przeszła test startu. Powód: same dolne granice (>=) sprawiły, że przebudowa obrazu
+# 2026-09-25 zainstalowała SQLAlchemy 2.1.0 bez greenlet i kontener nie wstał.
+# Aktualizacja wersji = świadoma zmiana: podbić tutaj, przebudować, sprawdzić start.
+# Python w obrazie: 3.11 (python:3.11-slim).
+
 # FastAPI i serwer
-fastapi>=0.109.0
+fastapi==0.133.1
 # Starlette < 0.46: starsza sygnatura TemplateResponse(name, context). Od 0.46 wymagana
 # nowa sygnatura TemplateResponse(request, name, context) - wymagaloby przepisania ~8 wywolan
 # w app/main.py, planowane jako osobny task.
-starlette<0.46
-pydantic-settings>=2.0.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.6
+starlette==0.45.3
+pydantic-settings==2.15.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
 
 # Szablony i pliki statyczne
-jinja2>=3.1.0
-aiofiles>=23.0.0
+jinja2==3.1.6
+aiofiles==25.1.0
 
 # Baza danych
-# [asyncio] dociąga greenlet - nowsze wydania SQLAlchemy nie instalują go same,
-# a bez niego sqlalchemy.ext.asyncio rzuca ImportError przy starcie (awaria 2026-09-25).
-sqlalchemy[asyncio]>=2.0.0
-aiosqlite>=0.19.0
+# [asyncio] + jawny greenlet - SQLAlchemy 2.1 nie instaluje go sam, a bez niego
+# sqlalchemy.ext.asyncio rzuca ImportError przy starcie (awaria 2026-09-25).
+sqlalchemy[asyncio]==2.1.0
+greenlet==3.5.6
+aiosqlite==0.22.1
 
 # Autentykacja
-python-jose[cryptography]>=3.3.0
-bcrypt>=4.0.0
-pydantic[email]>=2.0.0
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
+pydantic[email]==2.13.5
 
 # HTTP client (dla reCAPTCHA)
-httpx>=0.26.0
+httpx==0.28.1
 
 # Konwersja XML -> XLSX (z projektu głównego)
-lxml>=4.9.0
-openpyxl>=3.1.0
+lxml==6.1.3
+openpyxl==3.1.5
