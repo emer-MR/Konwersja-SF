@@ -13,7 +13,9 @@ jinja2>=3.1.0
 aiofiles>=23.0.0
 
 # Baza danych
-sqlalchemy>=2.0.0
+# [asyncio] dociąga greenlet - nowsze wydania SQLAlchemy nie instalują go same,
+# a bez niego sqlalchemy.ext.asyncio rzuca ImportError przy starcie (awaria 2026-09-25).
+sqlalchemy[asyncio]>=2.0.0
 aiosqlite>=0.19.0
 
 # Autentykacja
